@@ -1,0 +1,176 @@
+import type { ChangeEvent, VehicleDataBroker } from '../vss/databroker';
+import { SIGNALS, type SignalDef, type SignalValue } from '../vss/signals';
+import type { AppRuntime } from '../apps/vehicleApp';
+
+const SRC = 'Signal panel';
+/** Signals computed by the vehicle model; the panel only displays them. */
+const READ_ONLY = new Set(['Vehicle.Speed', 'Vehicle.TraveledDistance', 'Vehicle.Body.Lights.Brake.IsActive']);
+const MAX_TRACE_ROWS = 200;
+const MAX_TRACE_EVENTS = 20000;
+
+function el<K extends keyof HTMLElementTagNameMap>(tag: K, props: Partial<HTMLElementTagNameMap[K]> = {}, ...children: (Node | string)[]): HTMLElementTagNameMap[K] {
+  const node: HTMLElementTagNameMap[K] = document.createElement(tag);
+  Object.assign(node, props);
+  node.append(...children);
+  return node;
+}
+
+function formatValue(def: SignalDef, v: SignalValue): string {
+  if (def.type === 'boolean') return v ? 'true' : 'false';
+  if (def.type !== 'string' && typeof v === 'number') {
+    const text = def.type === 'float' ? v.toFixed(def.path === 'Vehicle.TraveledDistance' ? 2 : 1) : String(v);
+    return def.unit ? `${text} ${def.unit === 'degrees' ? '°' : def.unit}` : text;
+  }
+  return String(v);
+}
+
+function shortPath(path: string): string {
+  return path.replace(/^Vehicle\./, '');
+}
+
+/** Builds one control row per signal, wired both ways to the broker. */
+function signalRow(def: SignalDef, broker: VehicleDataBroker): HTMLElement {
+  const readout = el('span', { className: 'readout' });
+  const label = el('div', { className: 'sig-label' },
+    el('span', { className: 'sig-desc', textContent: def.description }),
+    el('code', { className: 'sig-path', textContent: shortPath(def.path), title: def.path }),
+  );
+  const row = el('div', { className: 'sig-row' }, label);
+
+  // Sensors are published by providers; actuators are requested, which lets ECUs and apps react.
+  const write = (value: SignalValue) =>
+    def.kind === 'actuator' ? broker.actuate(def.path, value, SRC) : broker.publishValue(def.path, value, SRC);
+
+  let update: (v: SignalValue) => void;
+  if (READ_ONLY.has(def.path)) {
+    row.append(readout);
+    row.classList.add('read-only');
+    update = (v) => (readout.textContent = formatValue(def, v));
+  } else if (def.type === 'boolean') {
+    const input = el('input', { type: 'checkbox', className: 'switch' });
+    input.setAttribute('aria-label', def.description);
+    input.addEventListener('change', () => write(input.checked));
+    row.append(input);
+    update = (v) => (input.checked = v as boolean);
+  } else if (def.type === 'string') {
+    const select = el('select', {}, ...def.allowed.map((a) => el('option', { value: a, textContent: a })));
+    select.addEventListener('change', () => write(select.value));
+    row.append(select);
+    update = (v) => (select.value = v as string);
+  } else if (def.path === 'Vehicle.Powertrain.Transmission.SelectedGear') {
+    const gears = [[-1, 'R'], [0, 'N'], [1, 'D']] as const;
+    const buttons = gears.map(([g, name]) => {
+      const btn = el('button', { type: 'button', textContent: name });
+      btn.addEventListener('click', () => write(g));
+      return [g, btn] as const;
+    });
+    row.append(el('div', { className: 'segmented' }, ...buttons.map(([, b]) => b)));
+    update = (v) => buttons.forEach(([g, b]) => b.classList.toggle('active', g === v));
+  } else {
+    const input = el('input', { type: 'range', min: String(def.min), max: String(def.max), step: String(def.step ?? (def.type === 'float' ? 0.5 : 1)) });
+    input.setAttribute('aria-label', def.description);
+    input.addEventListener('input', () => write(Number(input.value)));
+    row.append(el('div', { className: 'slider' }, input, readout));
+    update = (v) => {
+      input.value = String(v);
+      readout.textContent = formatValue(def, v);
+    };
+  }
+
+  broker.subscribe([def.path], (e) => {
+    update(e.value);
+    if (e.source !== 'initial') {
+      row.classList.remove('flash');
+      void row.offsetWidth; // restart the animation
+      row.classList.add('flash');
+    }
+  });
+  return row;
+}
+
+export function buildSignalsTab(broker: VehicleDataBroker): HTMLElement {
+  const root = el('div', { className: 'tab-body' });
+  const groups = new Map<string, SignalDef[]>();
+  for (const s of SIGNALS) groups.set(s.group, [...(groups.get(s.group) ?? []), s]);
+  for (const [group, defs] of groups) {
+    root.append(el('section', { className: 'group' }, el('h3', { textContent: group }), ...defs.map((d) => signalRow(d, broker))));
+  }
+  return root;
+}
+
+export function buildAppsTab(runtime: AppRuntime): HTMLElement {
+  const root = el('div', { className: 'tab-body' },
+    el('p', { className: 'hint', textContent: 'Third-party vehicle apps. They only use the VSS API — the same code would run against a real vehicle.' }),
+  );
+  for (const app of runtime.apps) {
+    const input = el('input', { type: 'checkbox', className: 'switch' });
+    input.setAttribute('aria-label', `Run ${app.name}`);
+    input.checked = runtime.isRunning(app.id);
+    input.addEventListener('change', () => runtime.setRunning(app.id, input.checked));
+    root.append(el('div', { className: 'app-card' },
+      el('div', {}, el('strong', { textContent: app.name }), el('p', { textContent: app.description })),
+      input,
+    ));
+  }
+  return root;
+}
+
+export function buildTraceTab(broker: VehicleDataBroker): HTMLElement {
+  const filter = el('input', { type: 'search', placeholder: 'Filter by path or source…' });
+  const hideDriving = el('input', { type: 'checkbox', checked: true });
+  const clear = el('button', { type: 'button', textContent: 'Clear' });
+  const tbody = el('tbody');
+  const table = el('table', { className: 'trace' },
+    el('thead', {}, el('tr', {}, ...['t (s)', 'Source', 'Signal', 'Value'].map((h) => el('th', { textContent: h })))),
+    tbody,
+  );
+  const root = el('div', { className: 'tab-body trace-tab' },
+    el('div', { className: 'trace-tools' }, filter, el('label', {}, hideDriving, ' Hide continuous signals'), clear),
+    el('div', { className: 'trace-scroll' }, table),
+  );
+
+  const continuous = /Speed$|PedalPosition$|SteeringWheel\.Angle$|TraveledDistance$/;
+  // Keep a large event buffer and render a filtered window, throttled, so high-rate
+  // signals (speed, pedals) never push rarer events out of view.
+  let events: ChangeEvent[] = [];
+  let scheduled = false;
+  const render = () => {
+    scheduled = false;
+    if (!root.isConnected) return;
+    const q = filter.value.trim().toLowerCase();
+    const rows: HTMLTableRowElement[] = [];
+    for (let i = events.length - 1; i >= 0 && rows.length < MAX_TRACE_ROWS; i--) {
+      const e = events[i];
+      if (hideDriving.checked && continuous.test(e.path)) continue;
+      if (q && !`${e.path} ${e.source}`.toLowerCase().includes(q)) continue;
+      rows.push(el('tr', {},
+        el('td', { textContent: (e.timestamp / 1000).toFixed(2) }),
+        el('td', { textContent: e.source, className: 'src', title: e.source }),
+        el('td', { textContent: shortPath(e.path), title: e.path }),
+        el('td', { textContent: String(e.value) }),
+      ));
+    }
+    tbody.replaceChildren(...rows);
+  };
+  const scheduleRender = () => {
+    if (!scheduled) {
+      scheduled = true;
+      setTimeout(render, 200);
+    }
+  };
+  filter.addEventListener('input', render);
+  hideDriving.addEventListener('change', render);
+  clear.addEventListener('click', () => {
+    events = [];
+    render();
+  });
+  // Rendering is skipped while the tab is hidden; catch up when it is shown again.
+  root.addEventListener('tab-shown', render);
+
+  broker.onAnyChange((e) => {
+    events.push(e);
+    if (events.length > MAX_TRACE_EVENTS) events = events.slice(-MAX_TRACE_EVENTS / 2);
+    scheduleRender();
+  });
+  return root;
+}

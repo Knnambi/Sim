@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SDV Sim</title>
+  </head>
+  <body>
+    <main class="layout">
+      <div class="stage">
+        <div id="viewport"></div>
+        <div class="hud" aria-live="off">
+          <span id="hud-left" class="ind" aria-label="Left indicator">◀</span>
+          <div class="speedo">
+            <span id="hud-speed">0</span><small>km/h</small>
+          </div>
+          <span id="hud-right" class="ind" aria-label="Right indicator">▶</span>
+          <div class="hud-meta">
+            <span id="hud-gear" class="gear">D</span>
+            <span id="hud-low" class="tell" title="Low beam">LOW</span>
+            <span id="hud-high" class="tell high" title="High beam">HIGH</span>
+            <span id="hud-odo" class="odo">0.00 km</span>
+          </div>
+        </div>
+        <div class="keys">
+          <b>W/S</b> throttle/brake · <b>A/D</b> steer · <b>R</b> reverse · <b>Q/E</b> indicators · <b>H</b> hazard · <b>L/K</b> low/high beam · drag to orbit
+        </div>
+      </div>
+      <aside class="panel">
+        <header>
+          <h1>SDV Sim</h1>
+          <p>Virtual vehicle on a VSS data broker</p>
+          <nav role="tablist">
+            <button role="tab" data-tab="signals">Signals</button>
+            <button role="tab" data-tab="apps">Apps</button>
+            <button role="tab" data-tab="trace">Trace</button>
+          </nav>
+        </header>
+        <div id="panel-body"></div>
+      </aside>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
