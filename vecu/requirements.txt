@@ -1,0 +1,4 @@
+kuksa-client==0.6.0
+python-can~=4.6
+msgpack~=1.1  # for the udp_multicast CAN interface
+cantools~=40.7

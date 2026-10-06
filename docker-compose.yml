@@ -1,7 +1,13 @@
-# Kuksa Databroker + WebSocket bridge (+ an external Python app).
-#   docker compose up            # databroker on :55555, bridge on :8091
-#   npm run dev                  # then open http://localhost:5173/?broker=kuksa
-#   docker compose --profile apps up   # also start the Python Speed Guard app
+# Kuksa Databroker + WebSocket bridge, plus optional profiles.
+#   docker compose up                    # databroker on :55555, bridge on :8091
+#   npm run dev                          # then open http://localhost:5173/?broker=kuksa
+#   docker compose --profile apps up     # + Python Speed Guard app
+#   docker compose --profile can up      # + BCM vECU and CAN provider on a CAN bus
+#                                        #   then open http://localhost:5173/?broker=kuksa&body=can
+#
+# The CAN bus uses python-can's udp_multicast interface here (works on any OS / Docker network).
+# For SocketCAN (vcan0) on a Linux host, add the override file (see README):
+#   docker compose -f docker-compose.yml -f docker-compose.socketcan.yml --profile can up
 services:
   databroker:
     image: ghcr.io/eclipse-kuksa/kuksa-databroker:0.6.0
@@ -22,5 +28,23 @@ services:
     profiles: ["apps"]
     build: ./apps/python
     command: ["--kuksa", "databroker:55555", "--limit", "100"]
+    depends_on:
+      - databroker
+
+  bcm-vecu:
+    profiles: ["can"]
+    build: ./vecu
+    command: ["bcm.py"]
+    environment:
+      CAN_INTERFACE: udp_multicast
+      CAN_CHANNEL: 239.74.163.2
+
+  can-provider:
+    profiles: ["can"]
+    build: ./vecu
+    command: ["can_provider.py", "--kuksa", "databroker:55555"]
+    environment:
+      CAN_INTERFACE: udp_multicast
+      CAN_CHANNEL: 239.74.163.2
     depends_on:
       - databroker

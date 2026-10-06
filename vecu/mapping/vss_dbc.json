@@ -1,0 +1,365 @@
+{
+  "Vehicle.Speed": {
+    "vss2dbc": {
+      "signal": "ESP_VehicleSpeed"
+    }
+  },
+  "Vehicle.Chassis.Brake.PedalPosition": {
+    "vss2dbc": {
+      "signal": "ESP_BrakePedalPos"
+    }
+  },
+  "Vehicle.Body.Lights.Brake.IsActive": {
+    "dbc2vss": {
+      "signal": "BCM_BrakeLampStatus",
+      "transform": {
+        "mapping": [
+          {
+            "from": "LIGHT_OFF",
+            "to": "INACTIVE"
+          },
+          {
+            "from": "LIGHT_ON",
+            "to": "ACTIVE"
+          },
+          {
+            "from": "LIGHT_FAULT",
+            "to": "INACTIVE"
+          },
+          {
+            "from": "LIGHT_SNA",
+            "to": "INACTIVE"
+          }
+        ]
+      }
+    }
+  },
+  "Vehicle.Body.Lights.Beam.Low.IsOn": {
+    "vss2dbc": {
+      "signal": "BCM_LowBeamCmd",
+      "transform": {
+        "mapping": [
+          {
+            "from": true,
+            "to": "ON"
+          },
+          {
+            "from": false,
+            "to": "OFF"
+          }
+        ]
+      }
+    },
+    "dbc2vss": {
+      "signal": "BCM_LowBeamStatus",
+      "transform": {
+        "mapping": [
+          {
+            "from": 1,
+            "to": true
+          },
+          {
+            "from": 0,
+            "to": false
+          }
+        ]
+      }
+    }
+  },
+  "Vehicle.Body.Lights.Beam.High.IsOn": {
+    "vss2dbc": {
+      "signal": "BCM_HighBeamCmd",
+      "transform": {
+        "mapping": [
+          {
+            "from": true,
+            "to": "ON"
+          },
+          {
+            "from": false,
+            "to": "OFF"
+          }
+        ]
+      }
+    },
+    "dbc2vss": {
+      "signal": "BCM_HighBeamStatus",
+      "transform": {
+        "mapping": [
+          {
+            "from": 1,
+            "to": true
+          },
+          {
+            "from": 0,
+            "to": false
+          }
+        ]
+      }
+    }
+  },
+  "Vehicle.Body.Lights.DirectionIndicator.Left.IsSignaling": {
+    "vss2dbc": {
+      "signal": "BCM_TurnLeftCmd",
+      "transform": {
+        "mapping": [
+          {
+            "from": true,
+            "to": "ON"
+          },
+          {
+            "from": false,
+            "to": "OFF"
+          }
+        ]
+      }
+    },
+    "dbc2vss": {
+      "signal": "BCM_TurnLeftStatus",
+      "transform": {
+        "mapping": [
+          {
+            "from": 1,
+            "to": true
+          },
+          {
+            "from": 0,
+            "to": false
+          }
+        ]
+      }
+    }
+  },
+  "Vehicle.Body.Lights.DirectionIndicator.Right.IsSignaling": {
+    "vss2dbc": {
+      "signal": "BCM_TurnRightCmd",
+      "transform": {
+        "mapping": [
+          {
+            "from": true,
+            "to": "ON"
+          },
+          {
+            "from": false,
+            "to": "OFF"
+          }
+        ]
+      }
+    },
+    "dbc2vss": {
+      "signal": "BCM_TurnRightStatus",
+      "transform": {
+        "mapping": [
+          {
+            "from": 1,
+            "to": true
+          },
+          {
+            "from": 0,
+            "to": false
+          }
+        ]
+      }
+    }
+  },
+  "Vehicle.Body.Lights.Hazard.IsSignaling": {
+    "vss2dbc": {
+      "signal": "BCM_HazardCmd",
+      "transform": {
+        "mapping": [
+          {
+            "from": true,
+            "to": "ON"
+          },
+          {
+            "from": false,
+            "to": "OFF"
+          }
+        ]
+      }
+    },
+    "dbc2vss": {
+      "signal": "BCM_HazardStatus",
+      "transform": {
+        "mapping": [
+          {
+            "from": 1,
+            "to": true
+          },
+          {
+            "from": 0,
+            "to": false
+          }
+        ]
+      }
+    }
+  },
+  "Vehicle.Cabin.Door.Row1.DriverSide.IsOpen": {
+    "vss2dbc": {
+      "signal": "BCM_DoorFLCmd",
+      "transform": {
+        "mapping": [
+          {
+            "from": true,
+            "to": "OPEN"
+          },
+          {
+            "from": false,
+            "to": "CLOSE"
+          }
+        ]
+      }
+    },
+    "dbc2vss": {
+      "signal": "BCM_DoorFLStatus",
+      "transform": {
+        "mapping": [
+          {
+            "from": 1,
+            "to": true
+          },
+          {
+            "from": 0,
+            "to": false
+          }
+        ]
+      }
+    }
+  },
+  "Vehicle.Cabin.Door.Row1.PassengerSide.IsOpen": {
+    "vss2dbc": {
+      "signal": "BCM_DoorFRCmd",
+      "transform": {
+        "mapping": [
+          {
+            "from": true,
+            "to": "OPEN"
+          },
+          {
+            "from": false,
+            "to": "CLOSE"
+          }
+        ]
+      }
+    },
+    "dbc2vss": {
+      "signal": "BCM_DoorFRStatus",
+      "transform": {
+        "mapping": [
+          {
+            "from": 1,
+            "to": true
+          },
+          {
+            "from": 0,
+            "to": false
+          }
+        ]
+      }
+    }
+  },
+  "Vehicle.Cabin.Door.Row2.DriverSide.IsOpen": {
+    "vss2dbc": {
+      "signal": "BCM_DoorRLCmd",
+      "transform": {
+        "mapping": [
+          {
+            "from": true,
+            "to": "OPEN"
+          },
+          {
+            "from": false,
+            "to": "CLOSE"
+          }
+        ]
+      }
+    },
+    "dbc2vss": {
+      "signal": "BCM_DoorRLStatus",
+      "transform": {
+        "mapping": [
+          {
+            "from": 1,
+            "to": true
+          },
+          {
+            "from": 0,
+            "to": false
+          }
+        ]
+      }
+    }
+  },
+  "Vehicle.Cabin.Door.Row2.PassengerSide.IsOpen": {
+    "vss2dbc": {
+      "signal": "BCM_DoorRRCmd",
+      "transform": {
+        "mapping": [
+          {
+            "from": true,
+            "to": "OPEN"
+          },
+          {
+            "from": false,
+            "to": "CLOSE"
+          }
+        ]
+      }
+    },
+    "dbc2vss": {
+      "signal": "BCM_DoorRRStatus",
+      "transform": {
+        "mapping": [
+          {
+            "from": 1,
+            "to": true
+          },
+          {
+            "from": 0,
+            "to": false
+          }
+        ]
+      }
+    }
+  },
+  "Vehicle.Body.Trunk.Rear.IsOpen": {
+    "vss2dbc": {
+      "signal": "BCM_TrunkCmd",
+      "transform": {
+        "mapping": [
+          {
+            "from": true,
+            "to": "OPEN"
+          },
+          {
+            "from": false,
+            "to": "CLOSE"
+          }
+        ]
+      }
+    },
+    "dbc2vss": {
+      "signal": "BCM_TrunkLatchStatus",
+      "transform": {
+        "mapping": [
+          {
+            "from": "LATCH_CLOSED",
+            "to": false
+          },
+          {
+            "from": "LATCH_OPENED",
+            "to": true
+          },
+          {
+            "from": "LATCH_AJAR",
+            "to": true
+          },
+          {
+            "from": "LATCH_FAULT",
+            "to": true
+          }
+        ]
+      }
+    }
+  }
+}

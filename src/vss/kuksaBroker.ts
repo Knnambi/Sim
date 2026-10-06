@@ -7,7 +7,7 @@ const REMOTE_SOURCE = 'Kuksa';
 
 export type BrokerStatus =
   | { state: 'connecting'; url: string }
-  | { state: 'connected'; url: string; server: string; kuksa: string }
+  | { state: 'connected'; url: string; server: string; kuksa: string; warning?: string }
   | { state: 'disconnected'; url: string; reason: string };
 
 type BridgeMessage =
@@ -39,15 +39,21 @@ export class KuksaDataBroker implements VehicleDataBroker {
   private initialised = false;
   status: BrokerStatus;
 
-  private constructor(private readonly url: string) {
+  private constructor(private readonly url: string, private readonly provides: (path: string) => boolean) {
     const now = performance.now();
     for (const s of SIGNALS) this.values.set(s.path, { value: s.default, timestamp: now });
     this.status = { state: 'connecting', url };
   }
 
-  /** Connects and resolves once the initial values have been loaded from Kuksa. */
-  static connect(url: string, timeoutMs = 5000): Promise<KuksaDataBroker> {
-    const broker = new KuksaDataBroker(url);
+  /**
+   * Connects and resolves once the initial values have been loaded from Kuksa.
+   * @param provides which actuators this page claims as provider (default: all of them).
+   */
+  static connect(
+    url: string,
+    { provides = (_path: string): boolean => true, timeoutMs = 5000 }: { provides?: (path: string) => boolean; timeoutMs?: number } = {},
+  ): Promise<KuksaDataBroker> {
+    const broker = new KuksaDataBroker(url, provides);
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => reject(new Error(`No answer from bridge at ${url}`)), timeoutMs);
       broker.open(() => {
@@ -89,6 +95,9 @@ export class KuksaDataBroker implements VehicleDataBroker {
           break;
         case 'error':
           console.warn(`[Kuksa] ${msg.op}${msg.path ? ` ${msg.path}` : ''}: ${msg.message}`);
+          if (msg.op === 'provide' && this.status.state === 'connected') {
+            this.setStatus({ ...this.status, warning: `Actuators not claimed: ${msg.message}` });
+          }
           break;
       }
     };
@@ -105,9 +114,9 @@ export class KuksaDataBroker implements VehicleDataBroker {
     if (this.ws.readyState === WebSocket.OPEN) this.ws.send(JSON.stringify(msg));
   }
 
-  /** The browser vehicle provides every actuator in the catalog; unclaimed ones just take the value. */
+  /** The browser vehicle provides its actuators; ones without a local handler just take the value. */
   private sendProvide(): void {
-    const actuators = SIGNALS.filter((s) => s.kind === 'actuator').map((s) => s.path);
+    const actuators = SIGNALS.filter((s) => s.kind === 'actuator' && this.provides(s.path)).map((s) => s.path);
     this.send({ type: 'provide', paths: actuators });
   }
 

@@ -7,6 +7,9 @@ const MAX_DECEL = 9; // m/s² at full brake
 const DRAG = 0.015; // per second, proportional to speed
 const ROLLING = 0.25; // m/s² constant resistance while moving
 
+/** Signals owned by the body ECU (lights, doors, trunk). */
+export const isBodySignal = (path: string) => path.startsWith('Vehicle.Body.') || path.startsWith('Vehicle.Cabin.Door.');
+
 export interface Pose {
   x: number;
   z: number;
@@ -30,8 +33,12 @@ export class VehicleModel {
   private odometerKm = 0;
   private lastPublishedSpeed = -1;
 
-  constructor(private readonly broker: VehicleDataBroker) {
-    this.installBodyController();
+  /**
+   * @param bodyController run the body ECU rules here. Off when a real/virtual BCM owns the body
+   *   signals (e.g. the CAN vECU in /vecu), so the browser only simulates motion.
+   */
+  constructor(private readonly broker: VehicleDataBroker, { bodyController = true } = {}) {
+    if (bodyController) this.installBodyController();
   }
 
   private installBodyController(): void {

@@ -1,7 +1,7 @@
 import './style.css';
 import { InMemoryDataBroker, type VehicleDataBroker } from './vss/databroker';
 import { KuksaDataBroker, type BrokerStatus } from './vss/kuksaBroker';
-import { VehicleModel } from './sim/vehicleModel';
+import { VehicleModel, isBodySignal } from './sim/vehicleModel';
 import { VehicleScene } from './sim/scene';
 import { AppRuntime } from './apps/vehicleApp';
 import { SAMPLE_APPS } from './apps/sampleApps';
@@ -10,9 +10,11 @@ import { buildAppsTab, buildSignalsTab, buildTraceTab } from './ui/panel';
 
 // ?broker=kuksa connects to a real Kuksa Databroker through the bridge (see /bridge);
 // ?bridge=ws://host:port overrides the bridge address.
+// ?body=can (with Kuksa) hands lights/doors/trunk to the CAN body ECU in /vecu.
 const params = new URLSearchParams(location.search);
+let bodyOnCan = false;
 const statusEl = document.getElementById('broker-status')!;
-function showStatus(text: string, state: 'local' | BrokerStatus['state'], title = '') {
+function showStatus(text: string, state: 'local' | 'warning' | BrokerStatus['state'], title = '') {
   statusEl.textContent = text;
   statusEl.dataset.state = state;
   statusEl.title = title;
@@ -26,9 +28,14 @@ async function createBroker(): Promise<VehicleDataBroker> {
   const url = params.get('bridge') ?? `ws://${location.hostname || 'localhost'}:8091`;
   showStatus('Connecting to Kuksa…', 'connecting', url);
   try {
-    const kuksa = await KuksaDataBroker.connect(url);
+    const wantCan = params.get('body') === 'can';
+    const kuksa = await KuksaDataBroker.connect(url, { provides: (path) => !(wantCan && isBodySignal(path)) });
+    bodyOnCan = wantCan;
+    const suffix = bodyOnCan ? ' · body ECU on CAN' : '';
     kuksa.onStatus((s) => {
-      if (s.state === 'connected') showStatus(`Kuksa · ${s.server}`, s.state, `${s.url} → ${s.kuksa}`);
+      if (s.state === 'connected' && s.warning) {
+        showStatus(`Kuksa · ${s.server} · actuators owned elsewhere`, 'warning', `${s.warning}\nIs the CAN body ECU running? Then add &body=can to the URL.`);
+      } else if (s.state === 'connected') showStatus(`Kuksa · ${s.server}${suffix}`, s.state, `${s.url} → ${s.kuksa}`);
       else if (s.state === 'connecting') showStatus('Reconnecting to Kuksa…', s.state, s.url);
       else showStatus('Kuksa offline', s.state, `${s.url}: ${s.reason}`);
     });
@@ -41,7 +48,7 @@ async function createBroker(): Promise<VehicleDataBroker> {
 }
 
 const broker = await createBroker();
-const vehicle = new VehicleModel(broker);
+const vehicle = new VehicleModel(broker, { bodyController: !bodyOnCan });
 const scene = new VehicleScene(document.getElementById('viewport')!, broker);
 const keyboard = new KeyboardDriver(broker);
 const apps = new AppRuntime(broker, SAMPLE_APPS);

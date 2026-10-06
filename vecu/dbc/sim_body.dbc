@@ -1,0 +1,77 @@
+VERSION "sdv-sim 1.0"
+
+
+NS_ :
+	NS_DESC_
+	CM_
+	BA_DEF_
+	BA_
+	VAL_
+	BA_DEF_DEF_
+	VAL_TABLE_
+	SIG_GROUP_
+	SIG_VALTYPE_
+
+BS_:
+
+BU_: GW BCM
+
+
+BO_ 288 ESP_Status: 8 GW
+ SG_ ESP_VehicleSpeed : 0|16@1+ (0.01,0) [0|655.35] "km/h" BCM
+ SG_ ESP_BrakePedalPos : 16|8@1+ (1,0) [0|100] "%" BCM
+
+BO_ 528 BCM_Request: 8 GW
+ SG_ BCM_RequestCounter : 0|4@1+ (1,0) [0|15] "" BCM
+ SG_ BCM_LowBeamCmd : 4|2@1+ (1,0) [0|2] "" BCM
+ SG_ BCM_HighBeamCmd : 6|2@1+ (1,0) [0|2] "" BCM
+ SG_ BCM_TurnLeftCmd : 8|2@1+ (1,0) [0|2] "" BCM
+ SG_ BCM_TurnRightCmd : 10|2@1+ (1,0) [0|2] "" BCM
+ SG_ BCM_HazardCmd : 12|2@1+ (1,0) [0|2] "" BCM
+ SG_ BCM_DoorFLCmd : 14|2@1+ (1,0) [0|2] "" BCM
+ SG_ BCM_DoorFRCmd : 16|2@1+ (1,0) [0|2] "" BCM
+ SG_ BCM_DoorRLCmd : 18|2@1+ (1,0) [0|2] "" BCM
+ SG_ BCM_DoorRRCmd : 20|2@1+ (1,0) [0|2] "" BCM
+ SG_ BCM_TrunkCmd : 22|2@1+ (1,0) [0|2] "" BCM
+
+BO_ 672 BCM_LampStatus: 8 BCM
+ SG_ BCM_LowBeamStatus : 0|1@1+ (1,0) [0|1] "" GW
+ SG_ BCM_HighBeamStatus : 1|1@1+ (1,0) [0|1] "" GW
+ SG_ BCM_TurnLeftStatus : 2|1@1+ (1,0) [0|1] "" GW
+ SG_ BCM_TurnRightStatus : 3|1@1+ (1,0) [0|1] "" GW
+ SG_ BCM_HazardStatus : 4|1@1+ (1,0) [0|1] "" GW
+ SG_ BCM_BrakeLampStatus : 5|2@1+ (1,0) [0|3] "" GW
+
+BO_ 673 BCM_DoorStatus: 8 BCM
+ SG_ BCM_DoorFLStatus : 0|1@1+ (1,0) [0|1] "" GW
+ SG_ BCM_DoorFRStatus : 1|1@1+ (1,0) [0|1] "" GW
+ SG_ BCM_DoorRLStatus : 2|1@1+ (1,0) [0|1] "" GW
+ SG_ BCM_DoorRRStatus : 3|1@1+ (1,0) [0|1] "" GW
+ SG_ BCM_TrunkLatchStatus : 4|2@1+ (1,0) [0|3] "" GW
+
+
+CM_ BO_ 288 "Chassis state the BCM needs: put on the bus by the gateway from VSS (the browser plays the ESP).";
+CM_ BO_ 528 "Event commands to the BCM. A new BCM_RequestCounter value marks a new command set; NO_REQUEST leaves a function unchanged.";
+CM_ BO_ 672 "Lamp outputs as driven by the BCM.";
+CM_ BO_ 673 "Door and trunk latch state as reported by the BCM.";
+CM_ SG_ 528 BCM_RequestCounter "Incremented by the sender for every new command set; repeats with the same value are ignored.";
+
+BA_DEF_ BO_ "GenMsgCycleTime" INT 0 10000;
+BA_DEF_DEF_ "GenMsgCycleTime" 0;
+BA_ "GenMsgCycleTime" BO_ 288 50;
+BA_ "GenMsgCycleTime" BO_ 528 100;
+BA_ "GenMsgCycleTime" BO_ 672 100;
+BA_ "GenMsgCycleTime" BO_ 673 100;
+
+VAL_ 528 BCM_LowBeamCmd 0 "NO_REQUEST" 1 "OFF" 2 "ON" ;
+VAL_ 528 BCM_HighBeamCmd 0 "NO_REQUEST" 1 "OFF" 2 "ON" ;
+VAL_ 528 BCM_TurnLeftCmd 0 "NO_REQUEST" 1 "OFF" 2 "ON" ;
+VAL_ 528 BCM_TurnRightCmd 0 "NO_REQUEST" 1 "OFF" 2 "ON" ;
+VAL_ 528 BCM_HazardCmd 0 "NO_REQUEST" 1 "OFF" 2 "ON" ;
+VAL_ 528 BCM_DoorFLCmd 0 "NO_REQUEST" 1 "CLOSE" 2 "OPEN" ;
+VAL_ 528 BCM_DoorFRCmd 0 "NO_REQUEST" 1 "CLOSE" 2 "OPEN" ;
+VAL_ 528 BCM_DoorRLCmd 0 "NO_REQUEST" 1 "CLOSE" 2 "OPEN" ;
+VAL_ 528 BCM_DoorRRCmd 0 "NO_REQUEST" 1 "CLOSE" 2 "OPEN" ;
+VAL_ 528 BCM_TrunkCmd 0 "NO_REQUEST" 1 "CLOSE" 2 "OPEN" ;
+VAL_ 672 BCM_BrakeLampStatus 0 "LIGHT_OFF" 1 "LIGHT_ON" 2 "LIGHT_FAULT" 3 "LIGHT_SNA" ;
+VAL_ 673 BCM_TrunkLatchStatus 0 "LATCH_CLOSED" 1 "LATCH_OPENED" 2 "LATCH_AJAR" 3 "LATCH_FAULT" ;

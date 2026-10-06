@@ -59,6 +59,8 @@ code { font-family: ui-monospace, 'JetBrains Mono', Menlo, monospace; }
 .broker-status[data-state='connecting']::before { background: var(--amber); }
 .broker-status[data-state='disconnected']::before { background: #ff5c5c; }
 .broker-status[data-state='local']::before { background: var(--blue); }
+.broker-status[data-state='warning']::before { background: var(--amber); }
+.broker-status[data-state='warning'] { color: var(--amber); }
 nav { display: flex; gap: 4px; }
 nav button {
   flex: 1; padding: 8px; background: none; border: 0; border-bottom: 2px solid transparent;

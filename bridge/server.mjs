@@ -95,6 +95,14 @@ function handleClient(ws) {
   let provider;
   const send = (msg) => ws.readyState === ws.OPEN && ws.send(JSON.stringify(msg));
   const fail = (op, err, p) => send({ type: 'error', op, path: p, message: describe(err) });
+  // A Kuksa stream ending (databroker restart, network loss) invalidates this session's
+  // subscriptions and provider registration. Close the socket; the browser reconnects and
+  // sets everything up again on a fresh session.
+  const streamLost = (op, err) => {
+    if (ws.readyState !== ws.OPEN) return;
+    console.warn(`[bridge] ${op} stream ended${err ? `: ${describe(err)}` : ''}; closing client session`);
+    ws.close(1011, `Kuksa ${op} stream ended`);
+  };
 
   async function signal(p) {
     const meta = (await metadata()).byPath.get(p);
@@ -110,7 +118,8 @@ function handleClient(ws) {
         const updates = Object.entries(entries).map(([p, dp]) => ({ path: p, value: fromKuksaValue(dp.value) }));
         send({ type: 'update', updates });
       });
-      call.on('error', (err) => err.code !== grpc.status.CANCELLED && fail('subscribe', err));
+      call.on('error', (err) => err.code !== grpc.status.CANCELLED && streamLost('subscribe', err));
+      call.on('end', () => streamLost('subscribe'));
     },
 
     publish({ path: p, value }) {
@@ -145,7 +154,19 @@ function handleClient(ws) {
             send({ type: 'actuationRequest', path: p, value: fromKuksaValue(req.value) });
           }
         });
-        provider.on('error', (err) => err.code !== grpc.status.CANCELLED && fail('provide', err));
+        let rejected = false;
+        provider.on('error', (err) => {
+          if (err.code === grpc.status.CANCELLED) return;
+          if (err.code === grpc.status.ALREADY_EXISTS) {
+            // Another client (e.g. the CAN provider) already provides some of these actuators.
+            // Kuksa rejects the whole request and closes the stream: report it, keep the session.
+            rejected = true;
+            provider = undefined;
+            return fail('provide', err);
+          }
+          streamLost('provide', err);
+        });
+        provider.on('end', () => !rejected && streamLost('provide'));
       }
       provider.write({ provide_actuation_request: { actuator_identifiers: paths.map((p) => ({ path: p })) } });
     },

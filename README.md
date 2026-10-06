@@ -18,8 +18,8 @@ simulator sits underneath.
  └──────▲─────────────────────────────────────────────────────────────┘
         │ provide actuation / publish sensors
  ┌──────┴─────────────────────────────────────────┐
- │ VehicleModel: powertrain (bicycle model) +     │  ← later: real vECUs via
- │ body controller rules (the "virtual ECUs")     │    vcan/CAN or SOME/IP providers
+ │ VehicleModel: powertrain (bicycle model) +     │  ← or a classic body ECU on CAN
+ │ body controller rules (the "virtual ECUs")     │    (vecu/, see below)
  └────────────────────────────────────────────────┘
 ```
 
@@ -73,6 +73,61 @@ and actuates the hazard lights through Kuksa, with no knowledge of the simulator
 **Keys:** `W/S` throttle/brake · `A/D` steer · `R` toggle reverse · `Q/E` indicators ·
 `H` hazard · `L/K` low/high beam · drag to orbit the camera.
 
+### With a classic body ECU on CAN
+
+The lights, doors and trunk can be handed to a **virtual Body Control Module** (BCM): a classic,
+signal-based ECU that only speaks CAN frames defined in a DBC file. A CAN provider connects that
+bus to Kuksa, so the chain becomes:
+
+```
+ app ── Actuate ──► Kuksa ──► can_provider ── BCM_Request (0x210) ──► BCM vECU
+                                                                        │ body rules
+ 3D car ◄── bridge ◄── Kuksa ◄── PublishValue ◄── can_provider ◄── BCM_LampStatus / BCM_DoorStatus (0x2A0/0x2A1)
+ browser ── Speed, Brake pedal ──► Kuksa ──► can_provider ── ESP_Status (0x120) ──► BCM vECU
+```
+
+```bash
+docker compose --profile can up      # Kuksa + bridge + BCM vECU + CAN provider
+npm run dev                          # open http://localhost:5173/?broker=kuksa&body=can
+```
+
+With `&body=can` the browser stops running its own body rules and no longer claims those
+actuators in Kuksa; the BCM does the work. Everything else is unchanged: the panel, keyboard,
+in-page apps and the Python Speed Guard all reach the BCM through Kuksa and CAN.
+
+| Piece | File | Notes |
+|---|---|---|
+| DBC | `vecu/dbc/sim_body.dbc` | `ESP_Status` (50 ms), `BCM_Request` (commands + rolling counter, 100 ms), `BCM_LampStatus`, `BCM_DoorStatus` (100 ms + on change). |
+| BCM vECU | `vecu/bcm.py` | Knows only CAN. Brake lamps from the pedal, high beam needs low beam, exclusive turn signals, doors/trunk locked above 5 km/h. Acts on a new `BCM_RequestCounter`, ignores cyclic repeats. |
+| CAN provider | `vecu/can_provider.py` | Kuksa v2 provider for the 10 body actuators: `Actuate` → command frame; status frames → `PublishValue`; speed/brake → `ESP_Status`. |
+| Mapping | `vecu/mapping/vss_dbc.json` | VSS ↔ DBC with `vss2dbc` / `dbc2vss` blocks and value `mapping` transforms, the same per-signal format as Kuksa's CAN provider (keyed by flat VSS paths). |
+| CAN monitor | `vecu/canmon.py` | Prints decoded frames, by default only when their content changes. |
+
+**Which CAN bus?** By default the nodes use python-can's `udp_multicast` interface (CAN frames
+over UDP multicast), which works on any OS and between Docker containers. On Linux you can use
+real SocketCAN instead:
+
+```bash
+sudo modprobe vcan
+sudo ip link add dev vcan0 type vcan && sudo ip link set up vcan0
+docker compose -f docker-compose.yml -f docker-compose.socketcan.yml --profile can up
+candump vcan0                        # can-utils: watch the raw frames
+```
+
+Running the CAN side without Docker:
+
+```bash
+pip install -r vecu/requirements.txt
+python vecu/bcm.py                         # add --interface socketcan --channel vcan0 for vcan
+python vecu/can_provider.py --kuksa 127.0.0.1:55555
+python vecu/canmon.py                      # watch the bus
+```
+
+> Why not the official [kuksa-can-provider](https://github.com/eclipse-kuksa/kuksa-can-provider)?
+> It uses Kuksa's older `kuksa.val.v1` API for actuator targets. Databroker 0.6 only routes
+> `Actuate` calls to `kuksa.val.v2` providers, so it would never receive them. It also only
+> supports SocketCAN. `vecu/can_provider.py` uses the same DBC and mapping approach on the v2 API.
+
 ## What's in Phase 1
 
 | Piece | File | Notes |
@@ -116,6 +171,7 @@ Add it to `SAMPLE_APPS` and it shows up in the Apps tab.
 
 1. ~~**Phase 1:** in-browser broker, 3D car, signal panel, sample apps, trace.~~
 2. ~~**Real Kuksa Databroker:** bridge + `KuksaDataBroker`, Python app driving the 3D car.~~
-3. **Classic vECU on CAN:** a Linux-hosted ECU on `vcan0`, mapped to VSS with Kuksa's CAN provider (DBC → VSS).
+3. ~~**Classic vECU on CAN:** BCM vECU + DBC + v2 CAN provider, on vcan0 or UDP multicast.~~
+   Next steps here: Classic AUTOSAR-generated vECU (e.g. ETAS ISOLAR-VRTA) on the same DBC; E2E protection (CRC) on `BCM_Request`.
 4. **Adaptive / SOME/IP:** a service-oriented vECU (e.g. S-CORE-based) bridged through vsomeip.
 5. **AI layer:** natural-language feature request → generated vehicle app; scenario generation; trace explanations.
