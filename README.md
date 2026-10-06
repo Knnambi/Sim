@@ -23,7 +23,7 @@ simulator sits underneath.
  └────────────────────────────────────────────────┘
 ```
 
-**Live demo:** https://knnambi.github.io/sim/ (in-browser mode; the Kuksa, CAN and SOME/IP modes
+**Live demo:** https://knnambi.github.io/Sim/ (in-browser mode; the Kuksa, CAN and SOME/IP modes
 need the local Docker stack below).
 
 ## Run it
