@@ -1,0 +1,2 @@
+# Only for regenerating the vECU from ARXML (arxml2vecu.py, arxml/make_sample_arxml.py)
+canmatrix[arxml]~=1.2

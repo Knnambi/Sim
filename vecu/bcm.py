@@ -1,9 +1,11 @@
 """Virtual Body Control Module (BCM): a classic, signal-based ECU on CAN.
 
-It knows nothing about VSS or Kuksa. Like a real classic ECU it
-  * receives ESP_Status (speed, brake pedal) and BCM_Request (commands with a rolling counter),
-  * applies its body rules,
-  * sends BCM_LampStatus and BCM_DoorStatus cyclically (100 ms) and immediately on change.
+It knows nothing about VSS or Kuksa. Its communication layer is generated from the AUTOSAR
+system description (arxml/sim_body.arxml -> arxml2vecu.py -> generated/bcm_com.py), so this
+file holds only the application logic, like a software component on top of an AUTOSAR RTE/COM:
+
+  receives  ESP_Status (speed, brake pedal) and BCM_Request (commands with a rolling counter)
+  sends     BCM_LampStatus and BCM_DoorStatus, cyclically (100 ms) and immediately on change
 
 Rules:
   * brake lamps follow the brake pedal (> 5 %)
@@ -21,112 +23,67 @@ import logging
 import threading
 import time
 
-from canbus import add_bus_arguments, encode, load_dbc, open_bus, sent_by
+from canbus import add_bus_arguments, open_bus
+from generated.bcm_com import (BCM_BrakeLampStatus, BCM_RequestCounter, BCM_TrunkLatchStatus, BcmBrakeLampStatus,
+                               BcmCom, BcmTrunkLatchStatus, ESP_BrakePedalPos, ESP_VehicleSpeed)
 
-NODE = "BCM"
 DOOR_LOCKOUT_KMH = 5.0
 BRAKE_LAMP_THRESHOLD = 5
+LAMPS = ("LowBeam", "HighBeam", "TurnLeft", "TurnRight", "Hazard")
 
 log = logging.getLogger("bcm")
 
 
 class BodyControlModule:
-    def __init__(self, bus, db):
-        self.bus = bus
-        self.db = db
+    def __init__(self, com: BcmCom):
+        self.com = com
         self.lock = threading.Lock()
-        self.speed = 0.0
-        self.brake = 0
         self.last_counter: int | None = None
-        self.lamps = {"LowBeam": 0, "HighBeam": 0, "TurnLeft": 0, "TurnRight": 0, "Hazard": 0}
-        self.doors = {"FL": 0, "FR": 0, "RL": 0, "RR": 0}
-        self.trunk_open = False
-        self.tx_messages = sent_by(db, NODE)
+        self.lamps = dict.fromkeys(LAMPS, 0)
+        com.on_receive(self.on_receive)
 
-    # --- inputs -------------------------------------------------------------------------
-
-    def on_frame(self, frame) -> None:
-        try:
-            message = self.db.get_message_by_frame_id(frame.arbitration_id)
-        except KeyError:
-            return
-        if NODE in message.senders:
-            return  # our own frame looped back by the bus
-        values = message.decode(frame.data)
+    def on_receive(self, message: str, values: dict) -> None:
         with self.lock:
-            before = self.status_values()
-            if message.name == "ESP_Status":
-                self.speed = float(values["ESP_VehicleSpeed"])
-                self.brake = int(values["ESP_BrakePedalPos"])
-            elif message.name == "BCM_Request":
-                counter = int(values["BCM_RequestCounter"])
+            if message == "ESP_Status":
+                lamp = BcmBrakeLampStatus.LIGHT_ON if values[ESP_BrakePedalPos] > BRAKE_LAMP_THRESHOLD else BcmBrakeLampStatus.LIGHT_OFF
+                self.com.write(BCM_BrakeLampStatus, lamp.name)
+            elif message == "BCM_Request":
+                counter = int(values[BCM_RequestCounter])
                 if counter == self.last_counter:
                     return  # cyclic repetition of a command set we already handled
                 self.last_counter = counter
                 self.apply_commands({k: str(v) for k, v in values.items() if k.endswith("Cmd")})
-            changed = self.status_values() != before
-        if changed:
-            self.send_status()  # event-triggered transmission on top of the cycle
 
     def apply_commands(self, cmds: dict[str, str]) -> None:
+        speed = float(self.com.read(ESP_VehicleSpeed, 0.0))
         for name, cmd in cmds.items():
             if cmd == "NO_REQUEST":
                 continue
             function = name.removeprefix("BCM_").removesuffix("Cmd")
             on = cmd in ("ON", "OPEN")
-            log.info("command %s=%s (counter %s, %.1f km/h)", function, cmd, self.last_counter, self.speed)
+            log.info("command %s=%s (counter %s, %.1f km/h)", function, cmd, self.last_counter, speed)
 
             if function in self.lamps:
-                self.lamps[function] = int(on)
+                self.set_lamp(function, on)
                 if function == "HighBeam" and on:
-                    self.lamps["LowBeam"] = 1
+                    self.set_lamp("LowBeam", True)
                 if function == "LowBeam" and not on:
-                    self.lamps["HighBeam"] = 0
+                    self.set_lamp("HighBeam", False)
                 if function in ("TurnLeft", "TurnRight") and on:
-                    self.lamps["TurnRight" if function == "TurnLeft" else "TurnLeft"] = 0
+                    self.set_lamp("TurnRight" if function == "TurnLeft" else "TurnLeft", False)
             elif function.startswith("Door") or function == "Trunk":
-                if on and self.speed > DOOR_LOCKOUT_KMH:
-                    log.warning("rejected %s OPEN: vehicle moving at %.1f km/h", function, self.speed)
+                if on and speed > DOOR_LOCKOUT_KMH:
+                    log.warning("rejected %s OPEN: vehicle moving at %.1f km/h", function, speed)
                     continue
                 if function == "Trunk":
-                    self.trunk_open = on
+                    latch = BcmTrunkLatchStatus.LATCH_OPENED if on else BcmTrunkLatchStatus.LATCH_CLOSED
+                    self.com.write(BCM_TrunkLatchStatus, latch.name)
                 else:
-                    self.doors[function.removeprefix("Door")] = int(on)
+                    self.com.write(f"BCM_{function}Status", int(on))
 
-    # --- outputs ------------------------------------------------------------------------
-
-    def status_values(self) -> dict[str, dict[str, object]]:
-        brake_lamp = "LIGHT_ON" if self.brake > BRAKE_LAMP_THRESHOLD else "LIGHT_OFF"
-        return {
-            "BCM_LampStatus": {
-                **{f"BCM_{k}Status": v for k, v in self.lamps.items()},
-                "BCM_BrakeLampStatus": brake_lamp,
-            },
-            "BCM_DoorStatus": {
-                **{f"BCM_Door{k}Status": v for k, v in self.doors.items()},
-                "BCM_TrunkLatchStatus": "LATCH_OPENED" if self.trunk_open else "LATCH_CLOSED",
-            },
-        }
-
-    def send_status(self) -> None:
-        with self.lock:
-            values = self.status_values()
-        for message in self.tx_messages:
-            self.bus.send(encode(message, values[message.name]))
-
-    def run(self) -> None:
-        def receiver():
-            while True:
-                frame = self.bus.recv(timeout=1.0)
-                if frame is not None:
-                    self.on_frame(frame)
-
-        threading.Thread(target=receiver, daemon=True).start()
-        cycle = min(m.cycle_time or 100 for m in self.tx_messages) / 1000
-        log.info("BCM online, sending %s every %.0f ms", ", ".join(m.name for m in self.tx_messages), cycle * 1000)
-        while True:
-            self.send_status()
-            time.sleep(cycle)
+    def set_lamp(self, lamp: str, on: bool) -> None:
+        self.lamps[lamp] = int(on)
+        self.com.write(f"BCM_{lamp}Status", int(on))
 
 
 def main() -> None:
@@ -135,11 +92,17 @@ def main() -> None:
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s: %(message)s", datefmt="%H:%M:%S")
     bus = open_bus(args.interface, args.channel)
+    com = BcmCom(bus)
+    BodyControlModule(com)
+    com.start()
+    log.info("BCM online (%s)", ", ".join(f"{m} every {com.tx[m].cycle_time} ms" for m in com.tx))
     try:
-        BodyControlModule(bus, load_dbc(args.dbc)).run()
+        while True:
+            time.sleep(1)
     except KeyboardInterrupt:
         pass
     finally:
+        com.stop()
         bus.shutdown()
 
 

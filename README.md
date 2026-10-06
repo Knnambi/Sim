@@ -101,10 +101,43 @@ in-page apps and the Python Speed Guard all reach the BCM through Kuksa and CAN.
 | Piece | File | Notes |
 |---|---|---|
 | DBC | `vecu/dbc/sim_body.dbc` | `ESP_Status` (50 ms), `BCM_Request` (commands + rolling counter, 100 ms), `BCM_LampStatus`, `BCM_DoorStatus` (100 ms + on change). |
-| BCM vECU | `vecu/bcm.py` | Knows only CAN. Brake lamps from the pedal, high beam needs low beam, exclusive turn signals, doors/trunk locked above 5 km/h. Acts on a new `BCM_RequestCounter`, ignores cyclic repeats. |
+| BCM vECU | `vecu/bcm.py` + `vecu/generated/bcm_com.py` | Application logic on a COM layer generated from ARXML; knows only CAN. Brake lamps from the pedal, high beam needs low beam, exclusive turn signals, doors/trunk locked above 5 km/h. Acts on a new `BCM_RequestCounter`, ignores cyclic repeats. |
 | CAN provider | `vecu/can_provider.py` | Kuksa v2 provider for the 10 body actuators: `Actuate` → command frame; status frames → `PublishValue`; speed/brake → `ESP_Status`. |
 | Mapping | `vecu/mapping/vss_dbc.json` | VSS ↔ DBC with `vss2dbc` / `dbc2vss` blocks and value `mapping` transforms, the same per-signal format as Kuksa's CAN provider (keyed by flat VSS paths). |
 | CAN monitor | `vecu/canmon.py` | Prints decoded frames, by default only when their content changes. |
+
+#### From an AUTOSAR ARXML to a running vECU
+
+The BCM's communication layer is **generated from an AUTOSAR system description**, the ARXML an
+authoring tool such as ETAS ISOLAR-A/AB exports. `vecu/bcm.py` itself is only the application
+logic, like a software component on top of an AUTOSAR RTE/COM:
+
+```
+ sim_body.arxml ──arxml2vecu.py──► generated/can.dbc            bus database (CAN provider, cantools, candump)
+ (ISOLAR export)                    generated/bcm_com.py         COM config: Tx/Rx frames, signal constants,
+                                                                 value-table enums, BcmCom class
+                                    generated/vss_dbc.bcm.json   VSS mapping for the CAN provider
+                                    generated/bcm_swc_template.py   application skeleton to fill in
+ bcm.py (logic) + generated/bcm_com.py + com_runtime.py (Rx, cyclic/on-change Tx)  =  BCM vECU
+```
+
+```bash
+pip install -r vecu/requirements-dev.txt          # canmatrix for ARXML import
+cd vecu
+python arxml2vecu.py arxml/sim_body.arxml --ecu BCM --out generated --mapping mapping/vss_dbc.json
+```
+
+**With your own ECU:** point it at your ARXML and pick the ECU to simulate
+(`--ecu <EcuInstance>`, plus `--cluster` if there are several CAN clusters). Copy
+`<ecu>_swc_template.py`, fill in the handlers, and complete the `TODO` entries in
+`vss_dbc.<ecu>.json` with VSS paths. Signals that are already in `--mapping` are carried over.
+
+`vecu/arxml/sim_body.arxml` is a *sample*. It was built from the DBC by
+`arxml/make_sample_arxml.py`, because no real ISOLAR export was available. Generating from it
+reproduces the original bus exactly: the same bytes on the wire for every frame, and the same
+VSS mapping. Exports from real tools vary (AUTOSAR 3/4, container PDUs, E2E, SecOC). ARXML is read
+with canmatrix, which handles the common variants. E2E protection and secured PDUs aren't
+modelled in the generated COM yet.
 
 **Which CAN bus?** By default the nodes use python-can's `udp_multicast` interface (CAN frames
 over UDP multicast), which works on any OS and between Docker containers. On Linux you can use

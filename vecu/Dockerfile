@@ -6,6 +6,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY *.py ./
 COPY dbc ./dbc
 COPY mapping ./mapping
+COPY generated ./generated
 ENV PYTHONUNBUFFERED=1
 ENTRYPOINT ["python"]
 CMD ["bcm.py"]

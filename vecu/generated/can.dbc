@@ -1,0 +1,177 @@
+VERSION "created by canmatrix"
+
+
+NS_ :
+
+BS_:
+
+BU_: GW BCM 
+
+
+BO_ 288 ESP_Status: 8 GW
+ SG_ ESP_VehicleSpeed : 0|16@1+ (0.01,0) [0.00|655.35] "km/h" BCM
+ SG_ ESP_BrakePedalPos : 16|8@1+ (1,0) [0|255] "%" BCM
+
+BO_ 528 BCM_Request: 8 GW
+ SG_ BCM_RequestCounter : 0|4@1+ (1,0) [0|15] "" BCM
+ SG_ BCM_LowBeamCmd : 4|2@1+ (1,0) [0|3] "" BCM
+ SG_ BCM_HighBeamCmd : 6|2@1+ (1,0) [0|3] "" BCM
+ SG_ BCM_TurnLeftCmd : 8|2@1+ (1,0) [0|3] "" BCM
+ SG_ BCM_TurnRightCmd : 10|2@1+ (1,0) [0|3] "" BCM
+ SG_ BCM_HazardCmd : 12|2@1+ (1,0) [0|3] "" BCM
+ SG_ BCM_DoorFLCmd : 14|2@1+ (1,0) [0|3] "" BCM
+ SG_ BCM_DoorFRCmd : 16|2@1+ (1,0) [0|3] "" BCM
+ SG_ BCM_DoorRLCmd : 18|2@1+ (1,0) [0|3] "" BCM
+ SG_ BCM_DoorRRCmd : 20|2@1+ (1,0) [0|3] "" BCM
+ SG_ BCM_TrunkCmd : 22|2@1+ (1,0) [0|3] "" BCM
+
+BO_ 672 BCM_LampStatus: 8 BCM
+ SG_ BCM_LowBeamStatus : 0|1@1+ (1,0) [0|1] "" GW
+ SG_ BCM_HighBeamStatus : 1|1@1+ (1,0) [0|1] "" GW
+ SG_ BCM_TurnLeftStatus : 2|1@1+ (1,0) [0|1] "" GW
+ SG_ BCM_TurnRightStatus : 3|1@1+ (1,0) [0|1] "" GW
+ SG_ BCM_HazardStatus : 4|1@1+ (1,0) [0|1] "" GW
+ SG_ BCM_BrakeLampStatus : 5|2@1+ (1,0) [0|3] "" GW
+
+BO_ 673 BCM_DoorStatus: 8 BCM
+ SG_ BCM_DoorFLStatus : 0|1@1+ (1,0) [0|1] "" GW
+ SG_ BCM_DoorFRStatus : 1|1@1+ (1,0) [0|1] "" GW
+ SG_ BCM_DoorRLStatus : 2|1@1+ (1,0) [0|1] "" GW
+ SG_ BCM_DoorRRStatus : 3|1@1+ (1,0) [0|1] "" GW
+ SG_ BCM_TrunkLatchStatus : 4|2@1+ (1,0) [0|3] "" GW
+
+
+CM_ BO_ 288  "Chassis state the BCM needs: put on the bus by the gateway from VSS (the browser plays the ESP).";
+CM_ BO_ 528  "Event commands to the BCM. A new BCM_RequestCounter value marks a new command set; NO_REQUEST leaves a function unchanged.";
+CM_ BO_ 672  "Lamp outputs as driven by the BCM.";
+CM_ BO_ 673  "Door and trunk latch state as reported by the BCM.";
+
+CM_ SG_ 528 BCM_RequestCounter "Incremented by the sender for every new command set; repeats with the same value are ignored.";
+
+
+BA_DEF_ BO_ "FrameTriggeringName" STRING;
+BA_DEF_ BO_ "GenMsgCycleTime" INT 0 65535;
+BA_DEF_ BO_ "GenMsgDelayTime" INT 0 65535;
+BA_DEF_ BO_ "GenMsgNrOfRepetitions" INT 0 65535;
+BA_DEF_ BO_ "GenMsgSendType" ENUM  "cyclicX","spontanX","cyclicIfActiveX","spontanWithDelay","cyclicAndSpontanX","cyclicAndSpontanWithDelay","spontanWithRepitition","cyclicIfActiveAndSpontanWD","cyclicIfActiveFast","cyclicWithRepeatOnDemand","none";
+BA_DEF_ BO_ "GenMsgStartDelayTime" INT 0 65535;
+BA_DEF_ BO_ "GenMsgStartValue" STRING;
+BA_DEF_ BO_ "PduName" STRING;
+BA_DEF_ SG_ "CompuMethodName" STRING;
+BA_DEF_ SG_ "ISignalName" STRING;
+BA_DEF_ SG_ "LongName" STRING;
+BA_DEF_ SG_ "SysSignalName" STRING;
+BA_DEF_ BU_ "NWM-Knoten" ENUM  "nein","ja";
+BA_DEF_ BU_ "NWM-Stationsadresse" HEX 0 63;
+BA_ "NWM-Knoten" BU_ GW 0;
+BA_ "NWM-Stationsadresse" BU_ GW 0;
+BA_ "NWM-Knoten" BU_ BCM 0;
+BA_ "NWM-Stationsadresse" BU_ BCM 0;
+
+
+BA_ "FrameTriggeringName" BO_ 288 "ESP_Status";
+BA_ "GenMsgCycleTime" BO_ 288 50;
+BA_ "GenMsgSendType" BO_ 288 0;
+BA_ "GenMsgStartValue" BO_ 288 "0000000000000000";
+BA_ "PduName" BO_ 288 "PDU_ESP_Status";
+BA_ "FrameTriggeringName" BO_ 528 "BCM_Request";
+BA_ "GenMsgCycleTime" BO_ 528 100;
+BA_ "GenMsgSendType" BO_ 528 0;
+BA_ "GenMsgStartValue" BO_ 528 "0000000000000000";
+BA_ "PduName" BO_ 528 "PDU_BCM_Request";
+BA_ "FrameTriggeringName" BO_ 672 "BCM_LampStatus";
+BA_ "GenMsgCycleTime" BO_ 672 100;
+BA_ "GenMsgSendType" BO_ 672 0;
+BA_ "GenMsgStartValue" BO_ 672 "0000000000000000";
+BA_ "PduName" BO_ 672 "PDU_BCM_LampStatus";
+BA_ "FrameTriggeringName" BO_ 673 "BCM_DoorStatus";
+BA_ "GenMsgCycleTime" BO_ 673 100;
+BA_ "GenMsgSendType" BO_ 673 0;
+BA_ "GenMsgStartValue" BO_ 673 "0000000000000000";
+BA_ "PduName" BO_ 673 "PDU_BCM_DoorStatus";
+
+BA_ "CompuMethodName" SG_ 288 ESP_VehicleSpeed "ESP_VehicleSpeed";
+BA_ "ISignalName" SG_ 288 ESP_VehicleSpeed "ESP_VehicleSpeed";
+BA_ "SysSignalName" SG_ 288 ESP_VehicleSpeed "ESP_VehicleSpeed";
+BA_ "CompuMethodName" SG_ 288 ESP_BrakePedalPos "ESP_BrakePedalPos";
+BA_ "ISignalName" SG_ 288 ESP_BrakePedalPos "ESP_BrakePedalPos";
+BA_ "SysSignalName" SG_ 288 ESP_BrakePedalPos "ESP_BrakePedalPos";
+BA_ "CompuMethodName" SG_ 528 BCM_RequestCounter "BCM_RequestCounter";
+BA_ "ISignalName" SG_ 528 BCM_RequestCounter "BCM_RequestCounter";
+BA_ "SysSignalName" SG_ 528 BCM_RequestCounter "BCM_RequestCounter";
+BA_ "CompuMethodName" SG_ 528 BCM_LowBeamCmd "BCM_LowBeamCmd";
+BA_ "ISignalName" SG_ 528 BCM_LowBeamCmd "BCM_LowBeamCmd";
+BA_ "SysSignalName" SG_ 528 BCM_LowBeamCmd "BCM_LowBeamCmd";
+BA_ "CompuMethodName" SG_ 528 BCM_HighBeamCmd "BCM_HighBeamCmd";
+BA_ "ISignalName" SG_ 528 BCM_HighBeamCmd "BCM_HighBeamCmd";
+BA_ "SysSignalName" SG_ 528 BCM_HighBeamCmd "BCM_HighBeamCmd";
+BA_ "CompuMethodName" SG_ 528 BCM_TurnLeftCmd "BCM_TurnLeftCmd";
+BA_ "ISignalName" SG_ 528 BCM_TurnLeftCmd "BCM_TurnLeftCmd";
+BA_ "SysSignalName" SG_ 528 BCM_TurnLeftCmd "BCM_TurnLeftCmd";
+BA_ "CompuMethodName" SG_ 528 BCM_TurnRightCmd "BCM_TurnRightCmd";
+BA_ "ISignalName" SG_ 528 BCM_TurnRightCmd "BCM_TurnRightCmd";
+BA_ "SysSignalName" SG_ 528 BCM_TurnRightCmd "BCM_TurnRightCmd";
+BA_ "CompuMethodName" SG_ 528 BCM_HazardCmd "BCM_HazardCmd";
+BA_ "ISignalName" SG_ 528 BCM_HazardCmd "BCM_HazardCmd";
+BA_ "SysSignalName" SG_ 528 BCM_HazardCmd "BCM_HazardCmd";
+BA_ "CompuMethodName" SG_ 528 BCM_DoorFLCmd "BCM_DoorFLCmd";
+BA_ "ISignalName" SG_ 528 BCM_DoorFLCmd "BCM_DoorFLCmd";
+BA_ "SysSignalName" SG_ 528 BCM_DoorFLCmd "BCM_DoorFLCmd";
+BA_ "CompuMethodName" SG_ 528 BCM_DoorFRCmd "BCM_DoorFRCmd";
+BA_ "ISignalName" SG_ 528 BCM_DoorFRCmd "BCM_DoorFRCmd";
+BA_ "SysSignalName" SG_ 528 BCM_DoorFRCmd "BCM_DoorFRCmd";
+BA_ "CompuMethodName" SG_ 528 BCM_DoorRLCmd "BCM_DoorRLCmd";
+BA_ "ISignalName" SG_ 528 BCM_DoorRLCmd "BCM_DoorRLCmd";
+BA_ "SysSignalName" SG_ 528 BCM_DoorRLCmd "BCM_DoorRLCmd";
+BA_ "CompuMethodName" SG_ 528 BCM_DoorRRCmd "BCM_DoorRRCmd";
+BA_ "ISignalName" SG_ 528 BCM_DoorRRCmd "BCM_DoorRRCmd";
+BA_ "SysSignalName" SG_ 528 BCM_DoorRRCmd "BCM_DoorRRCmd";
+BA_ "CompuMethodName" SG_ 528 BCM_TrunkCmd "BCM_TrunkCmd";
+BA_ "ISignalName" SG_ 528 BCM_TrunkCmd "BCM_TrunkCmd";
+BA_ "SysSignalName" SG_ 528 BCM_TrunkCmd "BCM_TrunkCmd";
+BA_ "CompuMethodName" SG_ 672 BCM_LowBeamStatus "BCM_LowBeamStatus";
+BA_ "ISignalName" SG_ 672 BCM_LowBeamStatus "BCM_LowBeamStatus";
+BA_ "SysSignalName" SG_ 672 BCM_LowBeamStatus "BCM_LowBeamStatus";
+BA_ "CompuMethodName" SG_ 672 BCM_HighBeamStatus "BCM_HighBeamStatus";
+BA_ "ISignalName" SG_ 672 BCM_HighBeamStatus "BCM_HighBeamStatus";
+BA_ "SysSignalName" SG_ 672 BCM_HighBeamStatus "BCM_HighBeamStatus";
+BA_ "CompuMethodName" SG_ 672 BCM_TurnLeftStatus "BCM_TurnLeftStatus";
+BA_ "ISignalName" SG_ 672 BCM_TurnLeftStatus "BCM_TurnLeftStatus";
+BA_ "SysSignalName" SG_ 672 BCM_TurnLeftStatus "BCM_TurnLeftStatus";
+BA_ "CompuMethodName" SG_ 672 BCM_TurnRightStatus "BCM_TurnRightStatus";
+BA_ "ISignalName" SG_ 672 BCM_TurnRightStatus "BCM_TurnRightStatus";
+BA_ "SysSignalName" SG_ 672 BCM_TurnRightStatus "BCM_TurnRightStatus";
+BA_ "CompuMethodName" SG_ 672 BCM_HazardStatus "BCM_HazardStatus";
+BA_ "ISignalName" SG_ 672 BCM_HazardStatus "BCM_HazardStatus";
+BA_ "SysSignalName" SG_ 672 BCM_HazardStatus "BCM_HazardStatus";
+BA_ "CompuMethodName" SG_ 672 BCM_BrakeLampStatus "BCM_BrakeLampStatus";
+BA_ "ISignalName" SG_ 672 BCM_BrakeLampStatus "BCM_BrakeLampStatus";
+BA_ "SysSignalName" SG_ 672 BCM_BrakeLampStatus "BCM_BrakeLampStatus";
+BA_ "CompuMethodName" SG_ 673 BCM_DoorFLStatus "BCM_DoorFLStatus";
+BA_ "ISignalName" SG_ 673 BCM_DoorFLStatus "BCM_DoorFLStatus";
+BA_ "SysSignalName" SG_ 673 BCM_DoorFLStatus "BCM_DoorFLStatus";
+BA_ "CompuMethodName" SG_ 673 BCM_DoorFRStatus "BCM_DoorFRStatus";
+BA_ "ISignalName" SG_ 673 BCM_DoorFRStatus "BCM_DoorFRStatus";
+BA_ "SysSignalName" SG_ 673 BCM_DoorFRStatus "BCM_DoorFRStatus";
+BA_ "CompuMethodName" SG_ 673 BCM_DoorRLStatus "BCM_DoorRLStatus";
+BA_ "ISignalName" SG_ 673 BCM_DoorRLStatus "BCM_DoorRLStatus";
+BA_ "SysSignalName" SG_ 673 BCM_DoorRLStatus "BCM_DoorRLStatus";
+BA_ "CompuMethodName" SG_ 673 BCM_DoorRRStatus "BCM_DoorRRStatus";
+BA_ "ISignalName" SG_ 673 BCM_DoorRRStatus "BCM_DoorRRStatus";
+BA_ "SysSignalName" SG_ 673 BCM_DoorRRStatus "BCM_DoorRRStatus";
+BA_ "CompuMethodName" SG_ 673 BCM_TrunkLatchStatus "BCM_TrunkLatchStatus";
+BA_ "ISignalName" SG_ 673 BCM_TrunkLatchStatus "BCM_TrunkLatchStatus";
+BA_ "SysSignalName" SG_ 673 BCM_TrunkLatchStatus "BCM_TrunkLatchStatus";
+
+VAL_ 528 BCM_LowBeamCmd 0 "NO_REQUEST" 1 "OFF" 2 "ON";
+VAL_ 528 BCM_HighBeamCmd 0 "NO_REQUEST" 1 "OFF" 2 "ON";
+VAL_ 528 BCM_TurnLeftCmd 0 "NO_REQUEST" 1 "OFF" 2 "ON";
+VAL_ 528 BCM_TurnRightCmd 0 "NO_REQUEST" 1 "OFF" 2 "ON";
+VAL_ 528 BCM_HazardCmd 0 "NO_REQUEST" 1 "OFF" 2 "ON";
+VAL_ 528 BCM_DoorFLCmd 0 "NO_REQUEST" 1 "CLOSE" 2 "OPEN";
+VAL_ 528 BCM_DoorFRCmd 0 "NO_REQUEST" 1 "CLOSE" 2 "OPEN";
+VAL_ 528 BCM_DoorRLCmd 0 "NO_REQUEST" 1 "CLOSE" 2 "OPEN";
+VAL_ 528 BCM_DoorRRCmd 0 "NO_REQUEST" 1 "CLOSE" 2 "OPEN";
+VAL_ 528 BCM_TrunkCmd 0 "NO_REQUEST" 1 "CLOSE" 2 "OPEN";
+VAL_ 672 BCM_BrakeLampStatus 0 "LIGHT_OFF" 1 "LIGHT_ON" 2 "LIGHT_FAULT" 3 "LIGHT_SNA";
+VAL_ 673 BCM_TrunkLatchStatus 0 "LATCH_CLOSED" 1 "LATCH_OPENED" 2 "LATCH_AJAR" 3 "LATCH_FAULT";
