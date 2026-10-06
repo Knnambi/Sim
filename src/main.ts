@@ -1,5 +1,6 @@
 import './style.css';
-import { InMemoryDataBroker } from './vss/databroker';
+import { InMemoryDataBroker, type VehicleDataBroker } from './vss/databroker';
+import { KuksaDataBroker, type BrokerStatus } from './vss/kuksaBroker';
 import { VehicleModel } from './sim/vehicleModel';
 import { VehicleScene } from './sim/scene';
 import { AppRuntime } from './apps/vehicleApp';
@@ -7,7 +8,39 @@ import { SAMPLE_APPS } from './apps/sampleApps';
 import { KeyboardDriver } from './ui/keyboard';
 import { buildAppsTab, buildSignalsTab, buildTraceTab } from './ui/panel';
 
-const broker = new InMemoryDataBroker();
+// ?broker=kuksa connects to a real Kuksa Databroker through the bridge (see /bridge);
+// ?bridge=ws://host:port overrides the bridge address.
+const params = new URLSearchParams(location.search);
+const statusEl = document.getElementById('broker-status')!;
+function showStatus(text: string, state: 'local' | BrokerStatus['state'], title = '') {
+  statusEl.textContent = text;
+  statusEl.dataset.state = state;
+  statusEl.title = title;
+}
+
+async function createBroker(): Promise<VehicleDataBroker> {
+  if (params.get('broker') !== 'kuksa') {
+    showStatus('In-browser broker', 'local', 'Add ?broker=kuksa to the URL to use a Kuksa Databroker');
+    return new InMemoryDataBroker();
+  }
+  const url = params.get('bridge') ?? `ws://${location.hostname || 'localhost'}:8091`;
+  showStatus('Connecting to Kuksa…', 'connecting', url);
+  try {
+    const kuksa = await KuksaDataBroker.connect(url);
+    kuksa.onStatus((s) => {
+      if (s.state === 'connected') showStatus(`Kuksa · ${s.server}`, s.state, `${s.url} → ${s.kuksa}`);
+      else if (s.state === 'connecting') showStatus('Reconnecting to Kuksa…', s.state, s.url);
+      else showStatus('Kuksa offline', s.state, `${s.url}: ${s.reason}`);
+    });
+    return kuksa;
+  } catch (err) {
+    console.error(err);
+    showStatus('Kuksa unreachable · using in-browser broker', 'disconnected', String(err));
+    return new InMemoryDataBroker();
+  }
+}
+
+const broker = await createBroker();
 const vehicle = new VehicleModel(broker);
 const scene = new VehicleScene(document.getElementById('viewport')!, broker);
 const keyboard = new KeyboardDriver(broker);

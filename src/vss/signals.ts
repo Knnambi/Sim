@@ -1,4 +1,4 @@
-// Subset of the COVESA Vehicle Signal Specification (VSS 4.x) used by the simulator.
+// Subset of the COVESA Vehicle Signal Specification (VSS 5.1, as shipped with Kuksa Databroker 0.6) used by the simulator.
 // Paths follow the official spec so the same names work against a real Kuksa Databroker.
 
 export type SignalValue = boolean | number | string;
@@ -19,7 +19,7 @@ export interface BoolSignal extends SignalBase {
 }
 
 export interface NumberSignal extends SignalBase {
-  type: 'float' | 'uint8' | 'int8' | 'uint16' | 'uint32';
+  type: 'float' | 'uint8' | 'int8' | 'int16' | 'uint16' | 'uint32';
   unit?: string;
   min: number;
   max: number;
@@ -47,7 +47,7 @@ export const SIGNALS: readonly SignalDef[] = [
   { path: 'Vehicle.Speed', type: 'float', kind: 'sensor', unit: 'km/h', min: 0, max: 250, default: 0, group: 'Driving', description: 'Vehicle speed' },
   { path: 'Vehicle.Chassis.Accelerator.PedalPosition', type: 'uint8', kind: 'sensor', unit: '%', min: 0, max: 100, default: 0, group: 'Driving', description: 'Accelerator pedal position' },
   { path: 'Vehicle.Chassis.Brake.PedalPosition', type: 'uint8', kind: 'sensor', unit: '%', min: 0, max: 100, default: 0, group: 'Driving', description: 'Brake pedal position' },
-  { path: 'Vehicle.Chassis.SteeringWheel.Angle', type: 'int8', kind: 'sensor', unit: 'degrees', min: -90, max: 90, default: 0, group: 'Driving', description: 'Steering angle (+ left)' },
+  { path: 'Vehicle.Chassis.SteeringWheel.Angle', type: 'int16', kind: 'sensor', unit: 'degrees', min: -90, max: 90, default: 0, group: 'Driving', description: 'Steering angle (+ left)' },
   { path: 'Vehicle.Powertrain.Transmission.SelectedGear', type: 'int8', kind: 'actuator', min: -1, max: 1, step: 1, default: 1, group: 'Driving', description: 'Gear (-1 R, 0 N, 1 D)' },
   { path: 'Vehicle.TraveledDistance', type: 'float', kind: 'sensor', unit: 'km', min: 0, max: 1e6, default: 0, group: 'Driving', description: 'Odometer' },
 
@@ -66,7 +66,7 @@ export const SIGNALS: readonly SignalDef[] = [
   { path: 'Vehicle.Body.Trunk.Rear.IsOpen', type: 'boolean', kind: 'actuator', default: false, group: 'Doors', description: 'Trunk open' },
 
   // Environment
-  { path: 'Vehicle.Exterior.LightIntensity', type: 'uint8', kind: 'sensor', unit: '%', min: 0, max: 100, default: 100, group: 'Environment', description: 'Ambient light (0 = dark, 100 = full daylight)' },
+  { path: 'Vehicle.Exterior.LightIntensity', type: 'float', step: 1, kind: 'sensor', unit: '%', min: 0, max: 100, default: 100, group: 'Environment', description: 'Ambient light (0 = dark, 100 = full daylight)' },
   { path: 'Vehicle.Exterior.AirTemperature', type: 'float', kind: 'sensor', unit: 'celsius', min: -30, max: 50, default: 18, group: 'Environment', description: 'Outside air temperature' },
 ];
 

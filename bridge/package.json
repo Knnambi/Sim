@@ -1,0 +1,15 @@
+{
+  "name": "sdv-sim-bridge",
+  "private": true,
+  "version": "0.1.0",
+  "description": "WebSocket <-> Kuksa Databroker (kuksa.val.v2 gRPC) bridge for the SDV simulator",
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs"
+  },
+  "dependencies": {
+    "@grpc/grpc-js": "^1.14.5",
+    "@grpc/proto-loader": "^0.8.1",
+    "ws": "^8.22.0"
+  }
+}

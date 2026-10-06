@@ -1,0 +1,26 @@
+# Kuksa Databroker + WebSocket bridge (+ an external Python app).
+#   docker compose up            # databroker on :55555, bridge on :8091
+#   npm run dev                  # then open http://localhost:5173/?broker=kuksa
+#   docker compose --profile apps up   # also start the Python Speed Guard app
+services:
+  databroker:
+    image: ghcr.io/eclipse-kuksa/kuksa-databroker:0.6.0
+    command: ["--insecure"]
+    ports:
+      - "55555:55555"
+
+  bridge:
+    build: ./bridge
+    environment:
+      KUKSA_ADDR: databroker:55555
+    ports:
+      - "8091:8091"
+    depends_on:
+      - databroker
+
+  speed-guard:
+    profiles: ["apps"]
+    build: ./apps/python
+    command: ["--kuksa", "databroker:55555", "--limit", "100"]
+    depends_on:
+      - databroker

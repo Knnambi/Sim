@@ -49,7 +49,16 @@ code { font-family: ui-monospace, 'JetBrains Mono', Menlo, monospace; }
 .panel { display: flex; flex-direction: column; background: var(--panel); border-left: 1px solid var(--border); min-height: 0; }
 .panel header { padding: 16px 16px 0; border-bottom: 1px solid var(--border); }
 .panel h1 { margin: 0; font-size: 18px; }
-.panel header p { margin: 2px 0 12px; color: var(--muted); font-size: 12px; }
+.panel header p { margin: 2px 0 8px; color: var(--muted); font-size: 12px; }
+.broker-status {
+  display: inline-flex; align-items: center; gap: 6px; margin-bottom: 12px; padding: 3px 9px; border-radius: 999px;
+  font-size: 11px; background: var(--panel-2); border: 1px solid var(--border); color: var(--muted);
+}
+.broker-status::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--muted); }
+.broker-status[data-state='connected']::before { background: var(--green); }
+.broker-status[data-state='connecting']::before { background: var(--amber); }
+.broker-status[data-state='disconnected']::before { background: #ff5c5c; }
+.broker-status[data-state='local']::before { background: var(--blue); }
 nav { display: flex; gap: 4px; }
 nav button {
   flex: 1; padding: 8px; background: none; border: 0; border-bottom: 2px solid transparent;
