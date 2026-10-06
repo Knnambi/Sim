@@ -171,6 +171,26 @@ Notes on [someipy](https://github.com/chrizog/someipy) 2.1.2, the pure-Python SO
 - For production-grade interop testing, the same service interfaces can be implemented with
   [vsomeip](https://github.com/COVESA/vsomeip) (C++). The wire format is standard SOME/IP.
 
+### AI layer (Claude)
+
+The **AI ✦** tab adds three Claude-powered tools. They call the Claude API (`claude-opus-5-5`)
+straight from the browser with **your own API key**, which is stored only in that browser's local
+storage. Use a key you can revoke, and never deploy a build with a key baked in.
+
+| Tool | What it does |
+|---|---|
+| **App Studio** | Describe a feature in plain English (*"close the windows when I drive faster than 30 km/h"*). Claude writes a vehicle app against the VSS signal catalog. You see the code and the result of static checks: known signals only, `actuate` only on actuators, no network/DOM/storage access. Then you run it; it appears in the Apps tab marked ✦. |
+| **Scenario Lab** | Describe a test (*"open the windows, then heavy rain: windows close and wipers start"*). Claude writes a timed scenario of stimuli and expectations. It runs against the live vehicle (in-browser, Kuksa, CAN and SOME/IP modes alike) and reports pass/fail per step. |
+| **Explain the trace** | Ask *"why did the hazards come on?"*. Claude reads the recorded signal trace (who changed what, when) and explains the cause→effect chain, citing timestamps. |
+
+Implementation: `src/ai/claude.ts` (Anthropic TypeScript SDK; structured outputs via Zod schemas;
+server-side refusal fallback `fallbacks: "default"`; cached system prompt containing the signal
+catalog), `src/ai/appCompiler.ts` (checks and a narrowed broker for generated apps),
+`src/ai/scenarioRunner.ts`.
+
+> The checks on generated apps catch mistakes; they are not a security sandbox. Generated code
+> runs in your page, so read it before pressing **Run app**.
+
 ## What's in Phase 1
 
 | Piece | File | Notes |
@@ -218,4 +238,4 @@ Add it to `SAMPLE_APPS` and it shows up in the Apps tab.
    Next steps here: Classic AUTOSAR-generated vECU (e.g. ETAS ISOLAR-VRTA) on the same DBC; E2E protection (CRC) on `BCM_Request`.
 4. ~~**Adaptive / SOME/IP:** comfort vECU with window/wiper services + SOME/IP provider.~~
    Next steps here: the same services on vsomeip or an S-CORE-based stack; SOME/IP-TP / TCP for large payloads.
-5. **AI layer:** natural-language feature request → generated vehicle app; scenario generation; trace explanations.
+5. ~~**AI layer:** natural-language feature request → generated vehicle app; scenario generation; trace explanations.~~

@@ -7,6 +7,7 @@ import { AppRuntime } from './apps/vehicleApp';
 import { SAMPLE_APPS } from './apps/sampleApps';
 import { KeyboardDriver } from './ui/keyboard';
 import { buildAppsTab, buildSignalsTab, buildTraceTab } from './ui/panel';
+import { buildAiTab } from './ui/aiTab';
 
 // ?broker=kuksa connects to a real Kuksa Databroker through the bridge (see /bridge);
 // ?bridge=ws://host:port overrides the bridge address.
@@ -62,7 +63,7 @@ apps.setRunning('auto-headlights', true);
 apps.setRunning('indicator-auto-cancel', true);
 
 // Sidebar tabs.
-const tabs = { signals: buildSignalsTab(broker), apps: buildAppsTab(apps), trace: buildTraceTab(broker) };
+const tabs = { signals: buildSignalsTab(broker), apps: buildAppsTab(apps), trace: buildTraceTab(broker), ai: buildAiTab(broker, apps) };
 const panelBody = document.getElementById('panel-body')!;
 const tabButtons = document.querySelectorAll<HTMLButtonElement>('[data-tab]');
 function showTab(name: keyof typeof tabs) {
