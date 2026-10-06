@@ -84,4 +84,29 @@ export const emergencyBrakeHazard: VehicleApp = {
   },
 };
 
-export const SAMPLE_APPS: readonly VehicleApp[] = [autoHeadlights, autoHighBeam, indicatorAutoCancel, emergencyBrakeHazard];
+/** Closes all open windows when it starts raining, and switches the wipers to the rain sensor. */
+export const rainGuard: VehicleApp = {
+  id: 'rain-guard',
+  name: 'Rain Guard',
+  description: 'When rain starts (> 20%): close open windows, wipers to RAIN_SENSOR if off.',
+  start(b) {
+    const self = this.name;
+    const windows = ['Row1.DriverSide', 'Row1.PassengerSide', 'Row2.DriverSide', 'Row2.PassengerSide'].map(
+      (pos) => `Vehicle.Cabin.Door.${pos}.Window.Position`,
+    );
+    let raining = false;
+    return b.subscribe(['Vehicle.Body.Raindetection.Intensity'], (e) => {
+      const nowRaining = (e.value as number) > 20;
+      if (nowRaining && !raining) {
+        // React to the start of rain only, so the driver can still open a window afterwards.
+        for (const w of windows) if ((b.get(w).value as number) > 0) b.actuate(w, 0, self);
+        if (b.get('Vehicle.Body.Windshield.Front.Wiping.Mode').value === 'OFF') {
+          b.actuate('Vehicle.Body.Windshield.Front.Wiping.Mode', 'RAIN_SENSOR', self);
+        }
+      }
+      raining = nowRaining;
+    });
+  },
+};
+
+export const SAMPLE_APPS: readonly VehicleApp[] = [autoHeadlights, autoHighBeam, indicatorAutoCancel, emergencyBrakeHazard, rainGuard];

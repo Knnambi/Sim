@@ -7,6 +7,32 @@ const BODY_COLOR = 0x2f6fde;
 const DAY_SKY = new THREE.Color(0x9cc8ef);
 const NIGHT_SKY = new THREE.Color(0x05070d);
 const BLINK_HZ = 1.5;
+const RAIN_SKY = new THREE.Color(0x6c7480);
+const RAIN_DROPS = 3000;
+const RAIN_HEIGHT = 14;
+const RAIN_RADIUS = 18;
+const WINDOW_TRAVEL = 0.48;
+const WIPER_SWEEP = 1.75; // radians
+
+/** Rain streaks: one line segment per drop, in a cylinder around the car. */
+function buildRain(): THREE.LineSegments {
+  const pos = new Float32Array(RAIN_DROPS * 6);
+  for (let i = 0; i < RAIN_DROPS; i++) {
+    const a = Math.random() * Math.PI * 2;
+    const r = Math.sqrt(Math.random()) * RAIN_RADIUS;
+    const x = Math.cos(a) * r;
+    const z = Math.sin(a) * r;
+    const y = Math.random() * RAIN_HEIGHT;
+    pos.set([x, y, z, x, y + 0.35, z], i * 6);
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setDrawRange(0, 0);
+  const drops = new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color: 0xaec3d8, transparent: true, opacity: 0.55 }));
+  drops.frustumCulled = false;
+  drops.visible = false;
+  return drops;
+}
 
 interface Lamp {
   mesh: THREE.Mesh;
@@ -32,6 +58,9 @@ class CarMesh {
   readonly frontWheels: THREE.Group[] = [];
   readonly wheels: THREE.Mesh[] = [];
   readonly doors = new Map<string, THREE.Group>();
+  /** Side window panes (inside the door groups), by door position. */
+  readonly windows = new Map<string, THREE.Mesh>();
+  readonly wipers: THREE.Group[] = [];
   readonly trunk = new THREE.Group();
   readonly headLow: Lamp[] = [];
   readonly headHigh: Lamp[] = [];
@@ -47,12 +76,57 @@ class CarMesh {
 
     const lower = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.55, 4.4), paint);
     lower.position.y = 0.6;
-    const cabin = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.5, 2.2), glass);
-    cabin.position.set(0, 1.12, 0.15);
     const roof = new THREE.Mesh(new THREE.BoxGeometry(1.62, 0.06, 2.0), paint);
     roof.position.set(0, 1.4, 0.2);
-    this.root.add(lower, cabin, roof);
-    for (const m of [lower, cabin, roof]) m.castShadow = true;
+    this.root.add(lower, roof);
+    for (const m of [lower, roof]) m.castShadow = true;
+
+    // Interior hint (seats, dashboard), visible through open windows.
+    const trim = new THREE.MeshStandardMaterial({ color: 0x2b2f36, roughness: 0.9 });
+    for (const z of [-0.15, 0.85]) {
+      const bench = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.45, 0.5), trim);
+      bench.position.set(0, 1.0, z);
+      this.root.add(bench);
+    }
+    const dash = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.15, 0.3), trim);
+    dash.position.set(0, 0.95, -0.85);
+    this.root.add(dash);
+
+    // Pillars and fixed glass. The windshield leans back from the hood to the roof.
+    const pillar = (x: number, z: number) => {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.52, 0.1), paint);
+      m.position.set(x, 1.13, z);
+      this.root.add(m);
+    };
+    for (const x of [-0.8, 0.8]) { pillar(x, 0.55); pillar(x, 1.2); }
+    const rearGlass = new THREE.Mesh(new THREE.PlaneGeometry(1.55, 0.48), glass);
+    rearGlass.position.set(0, 1.13, 1.22);
+    this.root.add(rearGlass);
+
+    const shield = new THREE.Group();
+    shield.position.set(0, 0.875, -1.2);
+    shield.rotation.x = Math.atan2(0.4, 0.5); // top edge leans back towards the roof
+    const shieldLen = Math.hypot(0.4, 0.5);
+    const windshield = new THREE.Mesh(new THREE.PlaneGeometry(1.55, shieldLen), glass);
+    windshield.position.y = shieldLen / 2;
+    shield.add(windshield);
+    for (const x of [-0.8, 0.8]) {
+      const aPillar = new THREE.Mesh(new THREE.BoxGeometry(0.06, shieldLen, 0.06), paint);
+      aPillar.position.set(x, shieldLen / 2, 0);
+      shield.add(aPillar);
+    }
+    // Two wipers, parked along the bottom edge, sweeping up across the glass.
+    const wiperMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.6 });
+    for (const x of [-0.6, 0.05]) {
+      const pivot = new THREE.Group();
+      pivot.position.set(x, 0.04, -0.03);
+      const blade = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.025, 0.025), wiperMat);
+      blade.position.x = 0.31;
+      pivot.add(blade);
+      shield.add(pivot);
+      this.wipers.push(pivot);
+    }
+    this.root.add(shield);
 
     // Wheels: front wheels sit inside a steering pivot.
     const tyreGeo = new THREE.CylinderGeometry(0.34, 0.34, 0.24, 20).rotateZ(Math.PI / 2);
@@ -85,7 +159,13 @@ class CarMesh {
       panel.castShadow = true;
       const handle = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.04, 0.18), hubMat);
       handle.position.set(side * 0.03, 0.12, 0.8);
-      hinge.add(panel, handle);
+      // Side window: closed it reaches the roof; opening slides it down into the door.
+      const paneLen = zFront < 0 ? 1.05 : 0.6;
+      const pane = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.5, paneLen), glass);
+      pane.position.set(-side * 0.08, 0.5, paneLen / 2);
+      pane.userData.closedY = 0.5;
+      hinge.add(panel, handle, pane);
+      this.windows.set(pos, pane);
       hinge.userData.side = side;
       this.root.add(hinge);
       this.doors.set(pos, hinge);
@@ -204,6 +284,12 @@ export class VehicleScene {
   private readonly doorTargets = new Map<string, number>();
   private trunkTarget = 0;
   private time = 0;
+  private readonly windowTargets = new Map<string, number>();
+  private wiperCpm = 0;
+  private wiperPhase = 0;
+  private daylight = 1;
+  private rain = 0;
+  private readonly rainDrops = buildRain();
 
   constructor(container: HTMLElement, private readonly broker: VehicleDataBroker) {
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -227,6 +313,7 @@ export class VehicleScene {
     Object.assign(this.sun.shadow.camera, { left: -30, right: 30, top: 30, bottom: -30 });
     this.scene.add(this.hemi, this.sun, this.sun.target, this.car.root);
     buildWorld(this.scene);
+    this.scene.add(this.rainDrops);
     this.scene.fog = new THREE.Fog(DAY_SKY, 80, 300);
 
     for (const pos of this.car.doors.keys()) this.doorTargets.set(pos, 0);
@@ -248,11 +335,29 @@ export class VehicleScene {
       b.subscribe([`Vehicle.Cabin.Door.${pos}.IsOpen`], (e) => this.doorTargets.set(pos, e.value ? 1 : 0));
     }
     b.subscribe(['Vehicle.Body.Trunk.Rear.IsOpen'], (e) => (this.trunkTarget = e.value ? 1 : 0));
-    b.subscribe(['Vehicle.Exterior.LightIntensity'], (e) => this.applyDaylight((e.value as number) / 100));
+    b.subscribe(['Vehicle.Exterior.LightIntensity'], (e) => {
+      this.daylight = (e.value as number) / 100;
+      this.applyDaylight();
+    });
+    b.subscribe(['Vehicle.Body.Raindetection.Intensity'], (e) => {
+      this.rain = (e.value as number) / 100;
+      this.rainDrops.geometry.setDrawRange(0, Math.round(this.rain * RAIN_DROPS) * 2);
+      this.rainDrops.visible = this.rain > 0;
+      this.applyDaylight();
+    });
+    for (const pos of this.car.windows.keys()) {
+      b.subscribe([`Vehicle.Cabin.Door.${pos}.Window.Position`], (e) => this.windowTargets.set(pos, e.value as number));
+    }
+    b.subscribe(['Vehicle.Body.Windshield.Front.Wiping.System.Frequency', 'Vehicle.Body.Windshield.Front.Wiping.System.IsWiping'], () => {
+      const wiping = b.get('Vehicle.Body.Windshield.Front.Wiping.System.IsWiping').value as boolean;
+      this.wiperCpm = wiping ? (b.get('Vehicle.Body.Windshield.Front.Wiping.System.Frequency').value as number) : 0;
+    });
   }
 
-  private applyDaylight(t: number): void {
-    const sky = NIGHT_SKY.clone().lerp(DAY_SKY, t);
+  private applyDaylight(): void {
+    // Rain clouds dim the daylight.
+    const t = this.daylight * (1 - 0.45 * this.rain);
+    const sky = NIGHT_SKY.clone().lerp(DAY_SKY.clone().lerp(RAIN_SKY, this.rain * 0.8), t);
     this.scene.background = sky;
     (this.scene.fog as THREE.Fog).color.copy(sky);
     this.hemi.intensity = 0.08 + 1.1 * t;
@@ -260,6 +365,23 @@ export class VehicleScene {
     for (const m of this.scene.userData.streetLamps as THREE.MeshStandardMaterial[]) {
       m.emissiveIntensity = t < 0.35 ? 2 : 0;
     }
+  }
+
+  private updateRain(dt: number): void {
+    if (!this.rainDrops.visible) return;
+    const attr = this.rainDrops.geometry.getAttribute('position') as THREE.BufferAttribute;
+    const pos = attr.array as Float32Array;
+    const count = Math.round(this.rain * RAIN_DROPS);
+    const fall = 11 * dt;
+    for (let i = 0; i < count; i++) {
+      let y = pos[i * 6 + 1] - fall;
+      if (y < 0) y += RAIN_HEIGHT;
+      pos[i * 6 + 1] = y;
+      pos[i * 6 + 4] = y + 0.35;
+    }
+    attr.needsUpdate = true;
+    // Rain falls around the car: keep the volume centred on it.
+    this.rainDrops.position.set(this.car.root.position.x, 0, this.car.root.position.z);
   }
 
   private applyLights(): void {
@@ -306,6 +428,23 @@ export class VehicleScene {
       hinge.rotation.y += (target - hinge.rotation.y) * k;
     }
     car.trunk.rotation.x += (this.trunkTarget * -1.2 - car.trunk.rotation.x) * k;
+
+    // Windows slide to the reported position (the motor speed itself lives in the ECU).
+    for (const [pos, pane] of car.windows) {
+      const target = pane.userData.closedY - ((this.windowTargets.get(pos) ?? 0) / 100) * WINDOW_TRAVEL;
+      pane.position.y += (target - pane.position.y) * Math.min(1, dt * 12);
+    }
+    // Wipers: one cycle = up and back. When switched off, finish the sweep and park.
+    const cycle = Math.PI * 2;
+    if (this.wiperCpm > 0) {
+      this.wiperPhase = (this.wiperPhase + dt * (this.wiperCpm / 60) * cycle) % cycle;
+    } else if (this.wiperPhase > 0) {
+      this.wiperPhase += dt * (40 / 60) * cycle;
+      if (this.wiperPhase >= cycle) this.wiperPhase = 0;
+    }
+    const sweep = ((1 - Math.cos(this.wiperPhase)) / 2) * WIPER_SWEEP;
+    car.wipers.forEach((w) => (w.rotation.z = sweep));
+    this.updateRain(dt);
 
     this.applyLights();
     this.controls.update();

@@ -1,0 +1,2 @@
+someipy==2.1.2
+kuksa-client==0.6.0

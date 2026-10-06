@@ -128,16 +128,59 @@ python vecu/canmon.py                      # watch the bus
 > `Actuate` calls to `kuksa.val.v2` providers, so it would never receive them. It also only
 > supports SocketCAN. `vecu/can_provider.py` uses the same DBC and mapping approach on the v2 API.
 
+### With a service-oriented comfort ECU on SOME/IP
+
+Windows and wipers can be handed to a **comfort vECU** built the Adaptive AUTOSAR way: it offers
+SOME/IP *services* (methods + events, found via SOME/IP Service Discovery) instead of sending
+signals in fixed frames.
+
+```
+ app ── Actuate(Window.Position) ──► Kuksa ──► someip_provider ── WindowControl.SetPosition() ──► comfort_ecu
+ 3D car ◄── bridge ◄── Kuksa ◄── PublishValue ◄── someip_provider ◄── WindowStatus event (100 ms while moving)
+ panel ── Raindetection.Intensity ──► Kuksa ──► someip_provider ── offers Environment.RainStatus ──► comfort_ecu
+                                                                       (wipers in RAIN_SENSOR mode)
+```
+
+```bash
+docker compose --profile someip up                 # Kuksa + bridge + comfort vECU + SOME/IP provider
+npm run dev                                        # open http://localhost:5173/?broker=kuksa&comfort=someip
+docker compose --profile can --profile someip up   # both external ECUs: ...?broker=kuksa&body=can&comfort=someip
+```
+
+| Piece | File | Notes |
+|---|---|---|
+| Service interfaces | `soa/interfaces.py` | Service/method/event IDs and payload structs (someipy serialization). `WindowControl` 0x6001, `WiperControl` 0x6002, `Environment` 0x6003. |
+| Comfort vECU | `soa/comfort_ecu.py` | Knows only SOME/IP. Window motors at 20 %/s, `WindowStatus` every 100 ms while moving. Wiper modes incl. `RAIN_SENSOR`, which consumes the `Environment` service. |
+| SOME/IP provider | `soa/someip_provider.py` | Kuksa v2 provider for the 4 window positions and the wiper mode. `Actuate` → method call; events → `PublishValue`. Offers rain intensity from VSS as a SOME/IP service. |
+| Launcher | `soa/run_with_daemon.sh` | One someipy daemon per ECU (container), bound to the container IP; SD on 224.224.224.245:30490. |
+
+Without Docker (one daemon serves both nodes on one host):
+
+```bash
+pip install -r soa/requirements.txt
+python soa/someipyd_patched.py &           # the someipy daemon
+python soa/comfort_ecu.py
+python soa/someip_provider.py --kuksa 127.0.0.1:55555
+```
+
+Notes on [someipy](https://github.com/chrizog/someipy) 2.1.2, the pure-Python SOME/IP stack used here:
+- `soa/someipyd_patched.py` starts its daemon with a one-line fix. `Method` is unhashable, which
+  crashes the daemon when a remote node subscribes to a service that also has methods.
+- The daemon client matches FindService replies by arrival order. So the provider sends one
+  method call at a time; concurrent calls could otherwise reach the wrong service.
+- For production-grade interop testing, the same service interfaces can be implemented with
+  [vsomeip](https://github.com/COVESA/vsomeip) (C++). The wire format is standard SOME/IP.
+
 ## What's in Phase 1
 
 | Piece | File | Notes |
 |---|---|---|
-| VSS signal catalog | `src/vss/signals.ts` | Real VSS 5.1 paths (speed, pedals, steering, gear, lights, doors, trunk, ambient light). |
+| VSS signal catalog | `src/vss/signals.ts` | Real VSS 5.1 paths (speed, pedals, steering, gear, lights, doors, trunk, windows, wipers, rain, ambient light). |
 | Data broker | `src/vss/databroker.ts` | `get`, `subscribe`, `publishValue` (sensors), `actuate` (actuators), `provideActuation` (providers own an actuator). |
 | Kuksa broker | `src/vss/kuksaBroker.ts`, `bridge/` | Same interface backed by Kuksa Databroker via the WebSocket ↔ gRPC bridge. |
-| Virtual ECUs | `src/sim/vehicleModel.ts` | Kinematic bicycle model, brake lights follow the pedal, high beam implies low beam, indicators are exclusive, doors refuse to open above 5 km/h. |
-| 3D vehicle | `src/sim/scene.ts` | Three.js car with animated doors/trunk, steering wheels, working headlights, tail/brake lamps, blinking indicators, day/night. |
-| Vehicle apps | `src/apps/sampleApps.ts` | Auto Headlights, Auto High Beam, Indicator Auto-Cancel, Emergency Brake Hazard, each toggleable in the **Apps** tab. |
+| Virtual ECUs | `src/sim/vehicleModel.ts` | Kinematic bicycle model, brake lights follow the pedal, high beam implies low beam, indicators are exclusive, doors refuse to open above 5 km/h; window motors and wiper modes (comfort controller). |
+| 3D vehicle | `src/sim/scene.ts` | Three.js car with animated doors/trunk, steering wheels, working headlights, tail/brake lamps, blinking indicators, sliding side windows, wipers, rain, day/night. |
+| Vehicle apps | `src/apps/sampleApps.ts` | Auto Headlights, Auto High Beam, Indicator Auto-Cancel, Emergency Brake Hazard, Rain Guard (closes windows when rain starts), each toggleable in the **Apps** tab. |
 | Signal trace | `src/ui/panel.ts` | Every change with its source (driver, app, ECU), so you can see the cause → effect chain. |
 
 You can also script it from the browser console:
@@ -173,5 +216,6 @@ Add it to `SAMPLE_APPS` and it shows up in the Apps tab.
 2. ~~**Real Kuksa Databroker:** bridge + `KuksaDataBroker`, Python app driving the 3D car.~~
 3. ~~**Classic vECU on CAN:** BCM vECU + DBC + v2 CAN provider, on vcan0 or UDP multicast.~~
    Next steps here: Classic AUTOSAR-generated vECU (e.g. ETAS ISOLAR-VRTA) on the same DBC; E2E protection (CRC) on `BCM_Request`.
-4. **Adaptive / SOME/IP:** a service-oriented vECU (e.g. S-CORE-based) bridged through vsomeip.
+4. ~~**Adaptive / SOME/IP:** comfort vECU with window/wiper services + SOME/IP provider.~~
+   Next steps here: the same services on vsomeip or an S-CORE-based stack; SOME/IP-TP / TCP for large payloads.
 5. **AI layer:** natural-language feature request → generated vehicle app; scenario generation; trace explanations.

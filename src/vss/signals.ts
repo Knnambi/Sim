@@ -65,8 +65,19 @@ export const SIGNALS: readonly SignalDef[] = [
   })),
   { path: 'Vehicle.Body.Trunk.Rear.IsOpen', type: 'boolean', kind: 'actuator', default: false, group: 'Doors', description: 'Trunk open' },
 
+  // Windows (comfort ECU)
+  ...doors.map(([pos, label]): NumberSignal => ({
+    path: `Vehicle.Cabin.Door.${pos}.Window.Position`, type: 'uint8', kind: 'actuator', unit: '%', min: 0, max: 100, default: 0, group: 'Windows', description: `Window ${label} (0 = closed)`,
+  })),
+
+  // Wipers (comfort ECU)
+  { path: 'Vehicle.Body.Windshield.Front.Wiping.Mode', type: 'string', kind: 'actuator', allowed: ['OFF', 'SLOW', 'MEDIUM', 'FAST', 'INTERVAL', 'RAIN_SENSOR'], default: 'OFF', group: 'Wipers', description: 'Wiper mode' },
+  { path: 'Vehicle.Body.Windshield.Front.Wiping.System.IsWiping', type: 'boolean', kind: 'sensor', default: false, group: 'Wipers', description: 'Wipers moving' },
+  { path: 'Vehicle.Body.Windshield.Front.Wiping.System.Frequency', type: 'uint8', kind: 'actuator', unit: 'cpm', min: 0, max: 255, default: 0, group: 'Wipers', description: 'Wiping frequency' },
+
   // Environment
   { path: 'Vehicle.Exterior.LightIntensity', type: 'float', step: 1, kind: 'sensor', unit: '%', min: 0, max: 100, default: 100, group: 'Environment', description: 'Ambient light (0 = dark, 100 = full daylight)' },
+  { path: 'Vehicle.Body.Raindetection.Intensity', type: 'uint8', kind: 'sensor', unit: '%', min: 0, max: 100, default: 0, group: 'Environment', description: 'Rain intensity (0 = dry)' },
   { path: 'Vehicle.Exterior.AirTemperature', type: 'float', kind: 'sensor', unit: 'celsius', min: -30, max: 50, default: 18, group: 'Environment', description: 'Outside air temperature' },
 ];
 

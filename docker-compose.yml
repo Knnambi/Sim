@@ -4,6 +4,9 @@
 #   docker compose --profile apps up     # + Python Speed Guard app
 #   docker compose --profile can up      # + BCM vECU and CAN provider on a CAN bus
 #                                        #   then open http://localhost:5173/?broker=kuksa&body=can
+#   docker compose --profile someip up   # + comfort vECU and SOME/IP provider
+#                                        #   then open http://localhost:5173/?broker=kuksa&comfort=someip
+#   (profiles combine: --profile can --profile someip, URL ...&body=can&comfort=someip)
 #
 # The CAN bus uses python-can's udp_multicast interface here (works on any OS / Docker network).
 # For SocketCAN (vcan0) on a Linux host, add the override file (see README):
@@ -46,5 +49,17 @@ services:
     environment:
       CAN_INTERFACE: udp_multicast
       CAN_CHANNEL: 239.74.163.2
+    depends_on:
+      - databroker
+
+  comfort-ecu:
+    profiles: ["someip"]
+    build: ./soa
+    command: ["comfort_ecu.py"]
+
+  someip-provider:
+    profiles: ["someip"]
+    build: ./soa
+    command: ["someip_provider.py", "--kuksa", "databroker:55555"]
     depends_on:
       - databroker

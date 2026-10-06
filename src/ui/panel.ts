@@ -4,7 +4,13 @@ import type { AppRuntime } from '../apps/vehicleApp';
 
 const SRC = 'Signal panel';
 /** Signals computed by the vehicle model; the panel only displays them. */
-const READ_ONLY = new Set(['Vehicle.Speed', 'Vehicle.TraveledDistance', 'Vehicle.Body.Lights.Brake.IsActive']);
+const READ_ONLY = new Set([
+  'Vehicle.Speed',
+  'Vehicle.TraveledDistance',
+  'Vehicle.Body.Lights.Brake.IsActive',
+  'Vehicle.Body.Windshield.Front.Wiping.System.IsWiping',
+  'Vehicle.Body.Windshield.Front.Wiping.System.Frequency',
+]);
 const MAX_TRACE_ROWS = 200;
 const MAX_TRACE_EVENTS = 20000;
 
