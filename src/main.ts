@@ -13,6 +13,13 @@ import { OsdviRuntime } from './vapi/osdvi';
 import { windowSyncApp } from './apps/osdviApps';
 import acmeProfile from './vapi/profiles/acme-example.json';
 import type { AttributeProfile } from './vapi/attributeApi';
+import { City } from './world/city';
+import { Crowd, Traffic, type Obstacle } from './world/agents';
+import { loadAssets } from './world/assets';
+import { CityView } from './world/cityView';
+import { Autopilot } from './autonomy/autopilot';
+import { RobotaxiService } from './apps/robotaxi';
+import { buildDriveTab } from './ui/driveTab';
 
 // ?broker=kuksa connects to a real Kuksa Databroker through the bridge (see /bridge);
 // ?bridge=ws://host:port overrides the bridge address.
@@ -68,8 +75,36 @@ const apps = new AppRuntime(broker, [...SAMPLE_APPS, windowSyncApp(osdvi)]);
 apps.setRunning('auto-headlights', true);
 apps.setRunning('indicator-auto-cancel', true);
 
+// The city: lane graph, traffic lights, NPC traffic and pedestrians.
+const city = new City();
+const traffic = new Traffic(city);
+const crowd = new Crowd(city);
+vehicle.pose.x = 2; // northbound lane of the central avenue
+vehicle.pose.z = 40;
+const egoObstacle = (): Obstacle => ({ p: { x: vehicle.pose.x, z: vehicle.pose.z }, radius: 1.3, id: 'ego', heading: vehicle.pose.heading });
+const autopilot = new Autopilot(city, broker, vehicle.pose, () => [
+  ...traffic.npcs.map((n) => ({ p: n.p, radius: 1.2, id: n.id, heading: n.heading })),
+  ...crowd.obstacles(),
+]);
+let cityView: CityView | null = null;
+traffic.setCount(18, vehicle.pose);
+crowd.setCount(40);
+loadAssets().then((clone) => {
+  const view = new CityView(city, clone, traffic, crowd);
+  scene.attachWorld(view.group, (p) => city.heightAt(p));
+  scene.onDaylight((t) => view.setDaylight(t));
+  cityView = view;
+}).catch((err) => console.error('Could not load the city models', err));
+const freeBays = () => city.lot.bays
+  .filter((b) => !cityView?.occupiedBays.has(b.id) && Math.hypot(b.center.x - vehicle.pose.x, b.center.z - vehicle.pose.z) > 2.5)
+  .map((b) => b.id);
+const robotaxi = new RobotaxiService(city, broker, vehicle.pose, autopilot, crowd, osdvi,
+  () => freeBays()[0] ?? null, (on) => scene.setTaxiSign(on));
+
 // Sidebar tabs.
-const tabs = { signals: buildSignalsTab(broker), apps: buildAppsTab(apps), trace: buildTraceTab(broker), apis: buildApiTab(broker, osdvi, [acmeProfile as AttributeProfile]), ai: buildAiTab(broker, apps) };
+const tabs = { signals: buildSignalsTab(broker), apps: buildAppsTab(apps), trace: buildTraceTab(broker), apis: buildApiTab(broker, osdvi, [acmeProfile as AttributeProfile]), ai: buildAiTab(broker, apps),
+  drive: buildDriveTab({ city, pose: vehicle.pose, traffic, crowd, autopilot, robotaxi, freeBays,
+    showBay: (id) => cityView?.showBay(id), setCameraMode: (m) => scene.setCameraMode(m), cameraMode: () => scene.cameraMode }) };
 const panelBody = document.getElementById('panel-body')!;
 const tabButtons = document.querySelectorAll<HTMLButtonElement>('[data-tab]');
 function showTab(name: keyof typeof tabs) {
@@ -79,7 +114,7 @@ function showTab(name: keyof typeof tabs) {
   try { localStorage.setItem('sdv-sim.tab', name); } catch { /* storage unavailable */ }
 }
 tabButtons.forEach((b) => b.addEventListener('click', () => showTab(b.dataset.tab as keyof typeof tabs)));
-let initialTab: keyof typeof tabs = 'signals';
+let initialTab: keyof typeof tabs = 'drive';
 try {
   const saved = localStorage.getItem('sdv-sim.tab');
   if (saved && saved in tabs) initialTab = saved as keyof typeof tabs;
@@ -101,6 +136,24 @@ broker.subscribe(['Vehicle.TraveledDistance'], (e) => (hud.odo.textContent = `${
 broker.subscribe(['Vehicle.Powertrain.Transmission.SelectedGear'], (e) => (hud.gear.textContent = ({ '-1': 'R', '0': 'N', '1': 'D' } as Record<string, string>)[String(e.value)]));
 broker.subscribe(['Vehicle.Body.Lights.Beam.Low.IsOn'], (e) => hud.low.classList.toggle('on', e.value as boolean));
 broker.subscribe(['Vehicle.Body.Lights.Beam.High.IsOn'], (e) => hud.high.classList.toggle('on', e.value as boolean));
+const hudAuto = document.getElementById('hud-auto')!;
+const toast = document.getElementById('toast')!;
+let toastTimer = 0;
+function showToast(text: string) {
+  toast.textContent = text;
+  toast.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = window.setTimeout(() => (toast.hidden = true), 3500);
+}
+const CAMERAS = ['chase', 'orbit', 'top'] as const;
+window.addEventListener('keydown', (e) => {
+  if (e.key.toLowerCase() !== 'c' || e.repeat || (e.target as HTMLElement).closest('input, textarea, select')) return;
+  scene.setCameraMode(CAMERAS[(CAMERAS.indexOf(scene.cameraMode as typeof CAMERAS[number]) + 1) % CAMERAS.length]);
+});
+vehicle.onReject((what, from) => showToast(`Refused ${what} from ${from}: vehicle is moving`));
+autopilot.on((ev, detail) => {
+  if (ev === 'disengaged' && detail === 'driver took over') showToast('Autopilot disengaged: driver took over');
+});
 
 let last = performance.now();
 let elapsed = 0;
@@ -110,12 +163,18 @@ function frame(now: number) {
   last = now;
   elapsed += dt;
 
+  autopilot.step(dt, elapsed);
   const slices = Math.ceil(dt / 0.02);
   for (let i = 0; i < slices; i++) {
     keyboard.step(dt / slices);
     vehicle.step(dt / slices);
   }
+  traffic.step(dt, elapsed, [egoObstacle()]);
+  crowd.step(dt, elapsed);
+  cityView?.update(elapsed, dt);
   scene.render(vehicle.pose, dt);
+  hudAuto.textContent = robotaxi.running ? 'ROBOTAXI' : autopilot.active ? 'AUTO' : '';
+  hudAuto.hidden = !autopilot.active && !robotaxi.running;
 
   const hazard = broker.get('Vehicle.Body.Lights.Hazard.IsSignaling').value as boolean;
   const blink = (elapsed * 1.5) % 1 < 0.5;
@@ -128,4 +187,4 @@ requestAnimationFrame(frame);
 
 // Exposed for experimenting from the browser console, e.g.
 //   sdv.broker.actuate('Vehicle.Cabin.Door.Row1.DriverSide.IsOpen', true, 'console')
-Object.assign(window, { sdv: { broker, apps, osdvi } });
+Object.assign(window, { sdv: { broker, apps, osdvi, city, traffic, crowd, autopilot, robotaxi, scene, vehicle } });

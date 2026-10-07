@@ -177,3 +177,23 @@ select, input[type='search'] {
   .keys { display: none; }
   .hud { bottom: 12px; }
 }
+
+/* Drive tab */
+.drive-tab .ai-row { flex-wrap: wrap; }
+.drive-tab button[aria-pressed='true'] { background: var(--accent); border-color: var(--accent); color: #fff; }
+.drive-range { display: flex; align-items: center; gap: 8px; font-size: 12px; margin-top: 8px; }
+.drive-range input { flex: 1; }
+.minimap { width: 100%; aspect-ratio: 1; border-radius: 8px; border: 1px solid var(--border); cursor: crosshair; display: block; margin-top: 8px; }
+.drive-mode { font-size: 11px; color: var(--muted); margin-left: auto; }
+.park-result { font-size: 12px; margin-top: 8px; }
+.park-result .pass { color: var(--green); }
+.park-result .fail { color: #ff7b7b; }
+.taxi-steps { list-style: none; padding: 0; margin: 10px 0 0; font-size: 12.5px; }
+.taxi-steps li { padding: 3px 0; color: var(--muted); }
+.taxi-steps li small { color: var(--muted); }
+.taxi-steps .taxi-active { color: var(--text); font-weight: 600; }
+.taxi-steps .taxi-done { color: var(--green); }
+.taxi-steps .taxi-failed { color: #ff7b7b; }
+.taxi-icon { display: inline-block; width: 1.2em; }
+.hud .auto { background: var(--accent); color: #fff; border-color: var(--accent); }
+.toast { position: absolute; top: 16px; left: 50%; transform: translateX(-50%); background: rgba(20, 22, 28, 0.9); color: #ffd28a; border: 1px solid #a8742a; padding: 8px 14px; border-radius: 8px; font-size: 13px; z-index: 5; max-width: 80%; }

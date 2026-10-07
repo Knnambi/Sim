@@ -256,6 +256,27 @@ catalog), `src/ai/appCompiler.ts` (checks and a narrowed broker for generated ap
 > The checks on generated apps catch mistakes; they are not a security sandbox. Generated code
 > runs in your page, so read it before pressing **Run app**.
 
+### City, autonomous driving, parking and robotaxi (Drive tab)
+
+The car drives in a small city: a 5 × 5 grid of streets with lane markings, crosswalks and
+signalised intersections, downtown towers, suburbs, a park and a parking lot, with AI traffic and
+pedestrians. The **Drive** tab holds the scenarios:
+
+| Scenario | What happens | Code |
+|---|---|---|
+| Vehicle control & convenience | Doors, windows, trunk, mirrors, wipers and lamps through VSS, OSDVI or an OEM profile. Responses differ while driving: doors and trunk refuse to open above 5 km/h, mirrors refuse to fold above 10 km/h (`E_OBJECT_STATUS` in OSDVI, a toast in the UI). | `src/sim/vehicleModel.ts`, `src/vapi/osdvi.ts` |
+| Autonomous driving | Click the map (or *Random destination*). The AI driver plans on the lane graph (A*), steers with pure pursuit and controls speed with IDM: it stops at red lights, follows cars, yields to crossing pedestrians and doesn't block intersections. It drives by publishing the VSS driver inputs (accelerator, brake, steering, gear), so ECUs and apps see an ordinary driver; pressing any driving key takes over. | `src/autonomy/autopilot.ts`, `src/world/` |
+| Autonomous parking | Pick a free bay: the car drives to the lot, pulls past the bay and reverses in. It is judged by **position error ≤ 0.5 m** and **heading error ≤ 5°** (PASS/FAIL shown with the measured values). Parking again later starts by pulling out of the bay. | `Autopilot.park()` |
+| Virtual ECU integration | Unchanged: the body ECU on CAN (Classic) and the comfort ECU on SOME/IP (Adaptive) work with all scenarios above, since everything goes through the broker. | `vecu/`, `soa/` |
+| Third-party app: robotaxi | *Hail a robotaxi*: a passenger appears at the curb; the app drives there, stops, turns the hazards on (VSS), opens the curbside rear door (OSDVI `Door.startMove`), the passenger boards, it drives to a destination, the passenger alights, and the car parks itself in the lot. Each step and API call is listed live. | `src/apps/robotaxi.ts` |
+
+Cameras: chase, orbit and top-down (**C** cycles). From the console: `sdv.autopilot.driveTo({x: 0, z: -100})`,
+`sdv.autopilot.park(3)`, `sdv.robotaxi.run()`, `sdv.traffic.setCount(30, sdv.vehicle.pose)`.
+
+3D models: [Kenney](https://kenney.nl) City Kit (Commercial, Suburban, Roads) and Car Kit, CC0
+(`public/models/kenney/*/License.txt`). The ego car is built in code so its doors, windows,
+mirrors, trunk, wipers and lamps can move independently.
+
 ## What's in Phase 1
 
 | Piece | File | Notes |
@@ -304,3 +325,4 @@ Add it to `SAMPLE_APPS` and it shows up in the Apps tab.
 4. ~~**Adaptive / SOME/IP:** comfort vECU with window/wiper services + SOME/IP provider.~~
    Next steps here: the same services on vsomeip or an S-CORE-based stack; SOME/IP-TP / TCP for large payloads.
 5. ~~**AI layer:** natural-language feature request → generated vehicle app; scenario generation; trace explanations.~~
+6. ~~**City and autonomy:** city with traffic lights, AI traffic and pedestrians; autopilot; auto-parking with scoring; robotaxi app.~~

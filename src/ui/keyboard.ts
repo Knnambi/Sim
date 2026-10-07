@@ -12,6 +12,8 @@ export class KeyboardDriver {
   private readonly down = new Set<string>();
   private steeringActive = false;
   private pedalsActive = false;
+  // Last values written, so another driver (e.g. the autopilot) taking over ends the hand-back.
+  private written = { accel: 0, brake: 0, steer: 0 };
 
   constructor(private readonly broker: VehicleDataBroker) {
     window.addEventListener('keydown', (e) => this.onKey(e, true));
@@ -58,21 +60,26 @@ export class KeyboardDriver {
 
     const gas = has('w', 'arrowup');
     const brake = has('s', 'arrowdown');
+    const accel = b.get('Vehicle.Chassis.Accelerator.PedalPosition').value as number;
+    const brk = b.get('Vehicle.Chassis.Brake.PedalPosition').value as number;
+    if (!gas && !brake && (accel !== this.written.accel || brk !== this.written.brake)) this.pedalsActive = false;
     if (gas || brake || this.pedalsActive) {
-      const accel = b.get('Vehicle.Chassis.Accelerator.PedalPosition').value as number;
-      const brk = b.get('Vehicle.Chassis.Brake.PedalPosition').value as number;
-      b.publishValue('Vehicle.Chassis.Accelerator.PedalPosition', approach(accel, gas ? 100 : 0, PEDAL_RATE), SRC);
-      b.publishValue('Vehicle.Chassis.Brake.PedalPosition', approach(brk, brake ? 100 : 0, PEDAL_RATE * 2), SRC);
+      this.written.accel = approach(accel, gas ? 100 : 0, PEDAL_RATE);
+      this.written.brake = approach(brk, brake ? 100 : 0, PEDAL_RATE * 2);
+      b.publishValue('Vehicle.Chassis.Accelerator.PedalPosition', this.written.accel, SRC);
+      b.publishValue('Vehicle.Chassis.Brake.PedalPosition', this.written.brake, SRC);
       // Keep driving the pedals until they are fully released, then hand control back to the panel.
       this.pedalsActive = gas || brake || accel > 0 || brk > 0;
     }
 
     const left = has('a', 'arrowleft');
     const right = has('d', 'arrowright');
+    const angle = b.get('Vehicle.Chassis.SteeringWheel.Angle').value as number;
+    if (!left && !right && angle !== this.written.steer) this.steeringActive = false;
     if (left || right || this.steeringActive) {
-      const angle = b.get('Vehicle.Chassis.SteeringWheel.Angle').value as number;
       const target = left === right ? 0 : left ? 90 : -90;
       const next = approach(angle, target, STEER_RATE);
+      this.written.steer = next;
       b.publishValue('Vehicle.Chassis.SteeringWheel.Angle', next, SRC);
       this.steeringActive = left || right || next !== 0;
     }

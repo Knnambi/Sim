@@ -20,10 +20,12 @@
             <span id="hud-low" class="tell" title="Low beam">LOW</span>
             <span id="hud-high" class="tell high" title="High beam">HIGH</span>
             <span id="hud-odo" class="odo">0.00 km</span>
+            <span id="hud-auto" class="tell auto" hidden></span>
           </div>
         </div>
+        <div id="toast" class="toast" role="status" hidden></div>
         <div class="keys">
-          <b>W/S</b> throttle/brake · <b>A/D</b> steer · <b>R</b> reverse · <b>Q/E</b> indicators · <b>H</b> hazard · <b>L/K</b> low/high beam · drag to orbit
+          <b>W/S</b> throttle/brake · <b>A/D</b> steer · <b>R</b> reverse · <b>Q/E</b> indicators · <b>H</b> hazard · <b>L/K</b> low/high beam · <b>C</b> camera
         </div>
       </div>
       <aside class="panel">
@@ -32,6 +34,7 @@
           <p>Virtual vehicle on a VSS data broker</p>
           <span id="broker-status" class="broker-status" data-state="connecting">Starting…</span>
           <nav role="tablist">
+            <button role="tab" data-tab="drive">Drive</button>
             <button role="tab" data-tab="signals">Signals</button>
             <button role="tab" data-tab="apps">Apps</button>
             <button role="tab" data-tab="trace">Trace</button>

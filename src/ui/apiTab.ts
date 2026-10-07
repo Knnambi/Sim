@@ -4,7 +4,7 @@ import type { ObjectName, OsdviApp, OsdviEvent, OsdviRuntime } from '../vapi/osd
 import { el } from './dom';
 
 const EXPLORER_APP = 'api-explorer';
-const OBJECTS: ObjectName[] = ['Window', 'Door', 'Trunk', 'Wiper'];
+const OBJECTS: ObjectName[] = ['Window', 'Door', 'Trunk', 'Mirror', 'Wiper'];
 const MAX_LOG = 40;
 
 /** Live explorer for the Open SDV API: pick an object and instance, call service calls, watch events. */
@@ -67,7 +67,7 @@ function osdviExplorer(rt: OsdviRuntime): { root: HTMLElement; tick: () => void 
 
   const root = el('section', { className: 'ai-section' },
     el('h3', { textContent: 'Open SDV API (OSDVI)' }),
-    el('p', { className: 'hint', textContent: 'Logical API of the Open SDV Initiative (spec 202603α), mapped onto the same VSS signals. Window/Door/Trunk/Wiper with startMove, stopMove, lock/unlock, getStatus and event queues. This explorer is OSDVI application "api-explorer".' }),
+    el('p', { className: 'hint', textContent: 'Logical API of the Open SDV Initiative (spec 202603α), mapped onto the same VSS signals. Window/Door/Trunk/Mirror/Wiper with startMove, stopMove, lock/unlock, getStatus and event queues. This explorer is OSDVI application "api-explorer".' }),
     el('div', { className: 'ai-row' }, objectSel, instanceSel),
     el('div', { className: 'ai-row api-params' }, targetLabel, intervalLabel, el('label', {}, 'priority ', priority)),
     actions, result,

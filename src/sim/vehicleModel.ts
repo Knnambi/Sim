@@ -1,18 +1,24 @@
 import type { VehicleDataBroker } from '../vss/databroker';
 
-const WHEELBASE_M = 2.7;
-const MAX_ROAD_WHEEL_ANGLE_RAD = (35 * Math.PI) / 180;
-const MAX_ACCEL = 4; // m/s² at full throttle
-const MAX_DECEL = 9; // m/s² at full brake
-const DRAG = 0.015; // per second, proportional to speed
-const ROLLING = 0.25; // m/s² constant resistance while moving
+export const WHEELBASE_M = 2.7;
+export const MAX_ROAD_WHEEL_ANGLE_RAD = (35 * Math.PI) / 180;
+export const MAX_ACCEL = 4; // m/s² at full throttle
+export const MAX_DECEL = 9; // m/s² at full brake
+export const DRAG = 0.015; // per second, proportional to speed
+export const ROLLING = 0.25; // m/s² constant resistance while moving
 
 /** Signals owned by the comfort ECU (windows, wipers). */
 export const isComfortSignal = (path: string) => path.includes('.Window.') || path.startsWith('Vehicle.Body.Windshield.Front.Wiping');
 
+/** Mirrors are always handled here (the CAN body ECU in /vecu doesn't model them). */
+export const isMirrorSignal = (path: string) => path.startsWith('Vehicle.Body.Mirrors.');
+
 /** Signals owned by the body ECU (lights, doors, trunk). */
 export const isBodySignal = (path: string) =>
-  (path.startsWith('Vehicle.Body.') || path.startsWith('Vehicle.Cabin.Door.')) && !isComfortSignal(path);
+  (path.startsWith('Vehicle.Body.') || path.startsWith('Vehicle.Cabin.Door.')) && !isComfortSignal(path) && !isMirrorSignal(path);
+
+/** Mirrors refuse to fold above this speed (they'd block the driver's view). */
+export const MIRROR_FOLD_MAX_KMH = 10;
 
 const WINDOW_PATHS = ['Row1.DriverSide', 'Row1.PassengerSide', 'Row2.DriverSide', 'Row2.PassengerSide'].map(
   (pos) => `Vehicle.Cabin.Door.${pos}.Window.Position`,
@@ -56,6 +62,7 @@ export class VehicleModel {
    */
   constructor(private readonly broker: VehicleDataBroker, { bodyController = true, comfortController = true } = {}) {
     if (bodyController) this.installBodyController();
+    this.installMirrorController();
     if (comfortController) this.installComfortController();
   }
 
@@ -99,12 +106,36 @@ export class VehicleModel {
     for (const path of doorPaths) {
       b.provideActuation(path, (open, from) => {
         if (open && (b.get('Vehicle.Speed').value as number) > 5) {
-          console.warn(`[BodyECU] rejected ${path}=true from ${from}: vehicle moving`);
+          this.reject(path.includes('Trunk') ? 'trunk open' : 'door open', from);
           return;
         }
         b.publishValue(path, open, from);
       });
     }
+  }
+
+  private installMirrorController(): void {
+    const b = this.broker;
+    for (const side of ['DriverSide', 'PassengerSide']) {
+      const path = `Vehicle.Body.Mirrors.${side}.IsFolded`;
+      b.provideActuation(path, (fold, from) => {
+        if (fold && (b.get('Vehicle.Speed').value as number) > MIRROR_FOLD_MAX_KMH) {
+          this.reject(`${side} mirror fold`, from);
+          return;
+        }
+        b.publishValue(path, fold, from);
+      });
+    }
+  }
+
+  /** Listeners told when the vehicle refuses a request (e.g. door open while driving). */
+  private readonly rejectListeners = new Set<(what: string, from: string) => void>();
+  onReject(cb: (what: string, from: string) => void): void {
+    this.rejectListeners.add(cb);
+  }
+  private reject(what: string, from: string): void {
+    console.warn(`[BodyECU] rejected ${what} from ${from}: vehicle moving`);
+    this.rejectListeners.forEach((cb) => cb(what, from));
   }
 
   private installComfortController(): void {

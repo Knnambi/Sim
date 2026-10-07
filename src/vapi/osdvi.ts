@@ -32,7 +32,7 @@ export interface PlacementType { row: number; zone: ZoneType }
 export interface LockStatusType { locked: boolean; lockApplication?: ApplicationIdType; lockPriority?: PriorityType }
 export interface ConfigType { instanceId: IdType; placement: PlacementType; capabilities: string[]; riskClasses: string[]; displayName: string }
 
-export type ObjectName = 'Window' | 'Door' | 'Trunk' | 'Wiper';
+export type ObjectName = 'Window' | 'Door' | 'Trunk' | 'Wiper' | 'Mirror';
 export type EventKind =
   | 'ControlledBySelf' | 'ControlledByOther' | 'TargetReached' | 'FaultDetected' | 'FaultRecovered'
   | 'OwnLockRevoked' | 'OtherLockReleased' | 'EventOverflow';
@@ -43,6 +43,7 @@ const PASSENGER_ZONE: ZoneType = 'Right';
 const DEFAULT_PRIORITY = 50;
 const QUEUE_LIMIT = 64;
 const DOOR_RISK_SPEED_KMH = 5;
+const MIRROR_RISK_SPEED_KMH = 10;
 
 interface Instance {
   config: ConfigType;
@@ -73,6 +74,12 @@ function instancesFor(object: ObjectName): Map<IdType, Instance> {
       vss: object === 'Window' ? `Vehicle.Cabin.Door.${pos}.Window.Position` : `Vehicle.Cabin.Door.${pos}.IsOpen`,
       lock: lock(), target: null,
     }));
+  } else if (object === 'Mirror') {
+    // Position 0 = folded, 100 = deployed (spec 4.27); backed by VSS IsFolded.
+    (['DriverSide', 'PassengerSide'] as const).forEach((side, i) => m.set(i + 1, {
+      config: { instanceId: i + 1, placement: { row: 1, zone: side === 'DriverSide' ? DRIVER_ZONE : PASSENGER_ZONE }, capabilities: ['Movable', 'ClosedDetectable'], riskClasses: ['RiskPinch', 'RiskCollision', 'RiskVisibility'], displayName: `${side === 'DriverSide' ? 'Driver' : 'Passenger'} mirror` },
+      vss: `Vehicle.Body.Mirrors.${side}.IsFolded`, lock: lock(), target: null,
+    }));
   } else if (object === 'Trunk') {
     m.set(1, { config: { instanceId: 1, placement: { row: 0, zone: 'Center' }, capabilities: ['Movable', 'ClosedDetectable'], riskClasses: ['RiskOpen', 'RiskPinch'], displayName: 'Rear trunk' }, vss: 'Vehicle.Body.Trunk.Rear.IsOpen', lock: lock(), target: null });
   } else {
@@ -89,7 +96,7 @@ export class OsdviRuntime {
   private readonly t0 = performance.now();
 
   constructor(readonly broker: VehicleDataBroker) {
-    for (const name of ['Window', 'Door', 'Trunk', 'Wiper'] as const) this.objects.set(name, instancesFor(name));
+    for (const name of ['Window', 'Door', 'Trunk', 'Wiper', 'Mirror'] as const) this.objects.set(name, instancesFor(name));
     // Detect TargetReached when the backing VSS signal arrives at the requested target.
     for (const [name, instances] of this.objects) {
       for (const [id, inst] of instances) {
@@ -124,6 +131,7 @@ export class OsdviRuntime {
   position(object: ObjectName, inst: Instance): PositionType {
     const v = this.broker.get(inst.vss).value;
     if (object === 'Window') return Math.round(v as number);
+    if (object === 'Mirror') return v ? 0 : 100; // IsFolded
     return v ? 100 : 0;
   }
 
@@ -175,6 +183,7 @@ export class OsdviApp {
   readonly Window: ReturnType<OsdviApp['movable']>;
   readonly Door: ReturnType<OsdviApp['movable']>;
   readonly Trunk: ReturnType<OsdviApp['movable']>;
+  readonly Mirror: ReturnType<OsdviApp['movable']>;
   readonly Wiper: ReturnType<OsdviApp['wiper']>;
 
   constructor(private readonly rt: OsdviRuntime, readonly appId: ApplicationIdType) {
@@ -182,6 +191,7 @@ export class OsdviApp {
     this.Window = this.movable('Window');
     this.Door = this.movable('Door');
     this.Trunk = this.movable('Trunk');
+    this.Mirror = this.movable('Mirror');
     this.Wiper = this.wiper();
   }
 
@@ -238,13 +248,14 @@ export class OsdviApp {
     return null;
   }
 
-  private movable(object: 'Window' | 'Door' | 'Trunk') {
+  private movable(object: 'Window' | 'Door' | 'Trunk' | 'Mirror') {
     const rt = this.rt;
     const app = this.appId;
     const self = this;
     const mainStatus = (inst: Instance, pos: PositionType) => {
       const target = inst.target ?? pos;
       if (object === 'Window') return target > pos ? 'Opening' : target < pos ? 'Closing' : 'Stopped';
+      // Mirror: 0 is folded (FullyStopped), deployed is UnlatchedStopped, as in the spec's state list.
       return target > pos ? 'Opening' : target < pos ? 'Closing' : pos === 0 ? 'FullyStopped' : 'UnlatchedStopped';
     };
     return {
@@ -264,13 +275,15 @@ export class OsdviApp {
         if (!Number.isInteger(targetPosition) || targetPosition < 0 || targetPosition > 100) return { returnValue: 'E_INVALID_PARAMETER' as ReturnCode };
         const locked = self.lockedOut(inst, priority);
         if (locked) return { returnValue: locked };
-        // Doors and trunk only have two end positions in this simulator.
+        // Doors, trunk and mirrors only have two end positions in this simulator.
         const target = object === 'Window' ? targetPosition : targetPosition > 0 ? 100 : 0;
-        if (object !== 'Window' && target > 0 && rt.speed() > DOOR_RISK_SPEED_KMH) return { returnValue: 'E_OBJECT_STATUS' as ReturnCode };
+        if ((object === 'Door' || object === 'Trunk') && target > 0 && rt.speed() > DOOR_RISK_SPEED_KMH) return { returnValue: 'E_OBJECT_STATUS' as ReturnCode };
+        if (object === 'Mirror' && target === 0 && rt.speed() > MIRROR_RISK_SPEED_KMH) return { returnValue: 'E_OBJECT_STATUS' as ReturnCode };
         inst.target = target;
         inst.mover = app;
         rt.emit(object, instanceId, 'ControlledBySelf', app);
-        rt.broker.actuate(inst.vss, object === 'Window' ? target : target > 0, `OSDVI ${app}`);
+        const vssValue = object === 'Window' ? target : object === 'Mirror' ? target === 0 : target > 0;
+        rt.broker.actuate(inst.vss, vssValue, `OSDVI ${app}`);
         if (rt.position(object, inst) === target) {
           inst.target = null;
           inst.mover = undefined;

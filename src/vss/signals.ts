@@ -63,6 +63,8 @@ export const SIGNALS: readonly SignalDef[] = [
   ...doors.map(([pos, label]): BoolSignal => ({
     path: `Vehicle.Cabin.Door.${pos}.IsOpen`, type: 'boolean', kind: 'actuator', default: false, group: 'Doors', description: `Door ${label} open`,
   })),
+  { path: 'Vehicle.Body.Mirrors.DriverSide.IsFolded', type: 'boolean', kind: 'actuator', default: false, group: 'Mirrors', description: 'Driver mirror folded' },
+  { path: 'Vehicle.Body.Mirrors.PassengerSide.IsFolded', type: 'boolean', kind: 'actuator', default: false, group: 'Mirrors', description: 'Passenger mirror folded' },
   { path: 'Vehicle.Body.Trunk.Rear.IsOpen', type: 'boolean', kind: 'actuator', default: false, group: 'Doors', description: 'Trunk open' },
 
   // Windows (comfort ECU)
