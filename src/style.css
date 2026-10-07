@@ -127,6 +127,20 @@ select, input[type='search'] {
 .link-button { background: none; border: 0; color: var(--muted); font: inherit; font-size: 12px; cursor: pointer; padding: 2px 4px; text-decoration: underline; }
 .link-button:hover { color: var(--text); }
 
+/* APIs tab */
+.api-tab h4 { margin: 12px 0 4px; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+.api-params { flex-wrap: wrap; font-size: 12px; color: var(--muted); }
+.api-params input { width: 64px; margin-left: 4px; background: var(--panel-2); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 4px 6px; }
+.api-actions { flex-wrap: wrap; }
+.api-status { max-height: 180px; }
+.api-log { font-size: 11px; font-family: ui-monospace, Menlo, monospace; color: var(--muted); padding-left: 22px; margin: 4px 0; max-height: 200px; overflow-y: auto; }
+.api-table td { white-space: normal; }
+.api-table td:first-child { font-family: ui-monospace, Menlo, monospace; }
+.api-value { color: var(--blue); }
+.api-set { display: inline-flex; gap: 4px; }
+.api-set select, .api-set input { max-width: 86px; }
+.api-set button { padding: 2px 8px !important; }
+
 /* AI tab */
 .ai-section { padding: 4px 0 16px; border-bottom: 1px solid var(--border); }
 .ai-section:last-child { border-bottom: 0; }

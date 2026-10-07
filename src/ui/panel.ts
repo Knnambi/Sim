@@ -1,6 +1,7 @@
 import type { ChangeEvent, VehicleDataBroker } from '../vss/databroker';
 import { SIGNALS, type SignalDef, type SignalValue } from '../vss/signals';
 import type { AppRuntime } from '../apps/vehicleApp';
+import { el } from './dom';
 
 const SRC = 'Signal panel';
 /** Signals computed by the vehicle model; the panel only displays them. */
@@ -14,12 +15,6 @@ const READ_ONLY = new Set([
 const MAX_TRACE_ROWS = 200;
 const MAX_TRACE_EVENTS = 20000;
 
-function el<K extends keyof HTMLElementTagNameMap>(tag: K, props: Partial<HTMLElementTagNameMap[K]> = {}, ...children: (Node | string)[]): HTMLElementTagNameMap[K] {
-  const node: HTMLElementTagNameMap[K] = document.createElement(tag);
-  Object.assign(node, props);
-  node.append(...children);
-  return node;
-}
 
 function formatValue(def: SignalDef, v: SignalValue): string {
   if (def.type === 'boolean') return v ? 'true' : 'false';

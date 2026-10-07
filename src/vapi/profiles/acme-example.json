@@ -1,0 +1,201 @@
+{
+  "id": "acme-vehicle-api-1.0",
+  "name": "ACME Vehicle API (example)",
+  "version": "1.0",
+  "description": "Fictional OEM-specific attribute API, included as an example of a declarative API profile. Replace it with your OEM's or K-SDV's attribute list.",
+  "attributes": [
+    {
+      "id": "drive.speed.kph",
+      "name": "Vehicle speed",
+      "access": "read",
+      "vss": "Vehicle.Speed",
+      "unit": "km/h"
+    },
+    {
+      "id": "drive.speed.mph",
+      "name": "Vehicle speed (mph)",
+      "access": "read",
+      "vss": "Vehicle.Speed",
+      "unit": "mph",
+      "scale": 0.621371
+    },
+    {
+      "id": "drive.gear",
+      "name": "Gear",
+      "access": "readwrite",
+      "vss": "Vehicle.Powertrain.Transmission.SelectedGear",
+      "valueMap": {
+        "R": -1,
+        "N": 0,
+        "D": 1
+      }
+    },
+    {
+      "id": "body.door.frontLeft.state",
+      "name": "Front left door",
+      "access": "readwrite",
+      "vss": "Vehicle.Cabin.Door.Row1.DriverSide.IsOpen",
+      "valueMap": {
+        "OPEN": true,
+        "CLOSED": false
+      }
+    },
+    {
+      "id": "body.door.frontRight.state",
+      "name": "Front right door",
+      "access": "readwrite",
+      "vss": "Vehicle.Cabin.Door.Row1.PassengerSide.IsOpen",
+      "valueMap": {
+        "OPEN": true,
+        "CLOSED": false
+      }
+    },
+    {
+      "id": "body.door.rearLeft.state",
+      "name": "Rear left door",
+      "access": "readwrite",
+      "vss": "Vehicle.Cabin.Door.Row2.DriverSide.IsOpen",
+      "valueMap": {
+        "OPEN": true,
+        "CLOSED": false
+      }
+    },
+    {
+      "id": "body.door.rearRight.state",
+      "name": "Rear right door",
+      "access": "readwrite",
+      "vss": "Vehicle.Cabin.Door.Row2.PassengerSide.IsOpen",
+      "valueMap": {
+        "OPEN": true,
+        "CLOSED": false
+      }
+    },
+    {
+      "id": "comfort.window.frontLeft.openPercent",
+      "name": "Front left window opening",
+      "access": "readwrite",
+      "vss": "Vehicle.Cabin.Door.Row1.DriverSide.Window.Position",
+      "unit": "%"
+    },
+    {
+      "id": "comfort.window.frontRight.openPercent",
+      "name": "Front right window opening",
+      "access": "readwrite",
+      "vss": "Vehicle.Cabin.Door.Row1.PassengerSide.Window.Position",
+      "unit": "%"
+    },
+    {
+      "id": "comfort.window.rearLeft.openPercent",
+      "name": "Rear left window opening",
+      "access": "readwrite",
+      "vss": "Vehicle.Cabin.Door.Row2.DriverSide.Window.Position",
+      "unit": "%"
+    },
+    {
+      "id": "comfort.window.rearRight.openPercent",
+      "name": "Rear right window opening",
+      "access": "readwrite",
+      "vss": "Vehicle.Cabin.Door.Row2.PassengerSide.Window.Position",
+      "unit": "%"
+    },
+    {
+      "id": "body.trunk.state",
+      "name": "Trunk",
+      "access": "readwrite",
+      "vss": "Vehicle.Body.Trunk.Rear.IsOpen",
+      "valueMap": {
+        "OPEN": true,
+        "CLOSED": false
+      }
+    },
+    {
+      "id": "light.headlamp.low",
+      "name": "Low beam",
+      "access": "readwrite",
+      "vss": "Vehicle.Body.Lights.Beam.Low.IsOn",
+      "valueMap": {
+        "ON": true,
+        "OFF": false
+      }
+    },
+    {
+      "id": "light.headlamp.high",
+      "name": "High beam",
+      "access": "readwrite",
+      "vss": "Vehicle.Body.Lights.Beam.High.IsOn",
+      "valueMap": {
+        "ON": true,
+        "OFF": false
+      }
+    },
+    {
+      "id": "light.hazard",
+      "name": "Hazard lights",
+      "access": "readwrite",
+      "vss": "Vehicle.Body.Lights.Hazard.IsSignaling",
+      "valueMap": {
+        "ON": true,
+        "OFF": false
+      }
+    },
+    {
+      "id": "light.turn.left",
+      "name": "Left turn signal",
+      "access": "readwrite",
+      "vss": "Vehicle.Body.Lights.DirectionIndicator.Left.IsSignaling",
+      "valueMap": {
+        "ON": true,
+        "OFF": false
+      }
+    },
+    {
+      "id": "light.turn.right",
+      "name": "Right turn signal",
+      "access": "readwrite",
+      "vss": "Vehicle.Body.Lights.DirectionIndicator.Right.IsSignaling",
+      "valueMap": {
+        "ON": true,
+        "OFF": false
+      }
+    },
+    {
+      "id": "light.brake",
+      "name": "Brake lamps",
+      "access": "read",
+      "vss": "Vehicle.Body.Lights.Brake.IsActive",
+      "valueMap": {
+        "OFF": "INACTIVE",
+        "ON": "ACTIVE",
+        "ADAPTIVE": "ADAPTIVE"
+      }
+    },
+    {
+      "id": "comfort.wiper.mode",
+      "name": "Wiper mode",
+      "access": "readwrite",
+      "vss": "Vehicle.Body.Windshield.Front.Wiping.Mode",
+      "valueMap": {
+        "OFF": "OFF",
+        "INT": "INTERVAL",
+        "LOW": "SLOW",
+        "MID": "MEDIUM",
+        "HIGH": "FAST",
+        "AUTO": "RAIN_SENSOR"
+      }
+    },
+    {
+      "id": "env.rain.level",
+      "name": "Rain level",
+      "access": "read",
+      "vss": "Vehicle.Body.Raindetection.Intensity",
+      "unit": "%"
+    },
+    {
+      "id": "env.light.level",
+      "name": "Ambient light",
+      "access": "read",
+      "vss": "Vehicle.Exterior.LightIntensity",
+      "unit": "%"
+    }
+  ]
+}

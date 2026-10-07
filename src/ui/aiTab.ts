@@ -3,15 +3,10 @@ import type { ChangeEvent, VehicleDataBroker } from '../vss/databroker';
 import { AiError, MODEL, explainTrace, generateApp, generateScenario, getApiKey, setApiKey, type GeneratedApp, type Scenario } from '../ai/claude';
 import { checkApp, toVehicleApp } from '../ai/appCompiler';
 import { checkScenario, runScenario, type StepResult } from '../ai/scenarioRunner';
+import { el } from './dom';
 
 const MAX_EVENTS = 20000;
 
-function el<K extends keyof HTMLElementTagNameMap>(tag: K, props: Partial<HTMLElementTagNameMap[K]> = {}, ...children: (Node | string)[]): HTMLElementTagNameMap[K] {
-  const node: HTMLElementTagNameMap[K] = document.createElement(tag);
-  Object.assign(node, props);
-  node.append(...children);
-  return node;
-}
 
 /** Runs an async action behind a button: disables it, shows progress and errors. */
 function busy(button: HTMLButtonElement, status: HTMLElement, label: string, action: () => Promise<void>) {

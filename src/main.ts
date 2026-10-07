@@ -8,6 +8,11 @@ import { SAMPLE_APPS } from './apps/sampleApps';
 import { KeyboardDriver } from './ui/keyboard';
 import { buildAppsTab, buildSignalsTab, buildTraceTab } from './ui/panel';
 import { buildAiTab } from './ui/aiTab';
+import { buildApiTab } from './ui/apiTab';
+import { OsdviRuntime } from './vapi/osdvi';
+import { windowSyncApp } from './apps/osdviApps';
+import acmeProfile from './vapi/profiles/acme-example.json';
+import type { AttributeProfile } from './vapi/attributeApi';
 
 // ?broker=kuksa connects to a real Kuksa Databroker through the bridge (see /bridge);
 // ?bridge=ws://host:port overrides the bridge address.
@@ -58,12 +63,13 @@ const broker = await createBroker();
 const vehicle = new VehicleModel(broker, { bodyController: !bodyOnCan, comfortController: !comfortOnSomeip });
 const scene = new VehicleScene(document.getElementById('viewport')!, broker);
 const keyboard = new KeyboardDriver(broker);
-const apps = new AppRuntime(broker, SAMPLE_APPS);
+const osdvi = new OsdviRuntime(broker);
+const apps = new AppRuntime(broker, [...SAMPLE_APPS, windowSyncApp(osdvi)]);
 apps.setRunning('auto-headlights', true);
 apps.setRunning('indicator-auto-cancel', true);
 
 // Sidebar tabs.
-const tabs = { signals: buildSignalsTab(broker), apps: buildAppsTab(apps), trace: buildTraceTab(broker), ai: buildAiTab(broker, apps) };
+const tabs = { signals: buildSignalsTab(broker), apps: buildAppsTab(apps), trace: buildTraceTab(broker), apis: buildApiTab(broker, osdvi, [acmeProfile as AttributeProfile]), ai: buildAiTab(broker, apps) };
 const panelBody = document.getElementById('panel-body')!;
 const tabButtons = document.querySelectorAll<HTMLButtonElement>('[data-tab]');
 function showTab(name: keyof typeof tabs) {
@@ -122,4 +128,4 @@ requestAnimationFrame(frame);
 
 // Exposed for experimenting from the browser console, e.g.
 //   sdv.broker.actuate('Vehicle.Cabin.Door.Row1.DriverSide.IsOpen', true, 'console')
-Object.assign(window, { sdv: { broker, apps } });
+Object.assign(window, { sdv: { broker, apps, osdvi } });

@@ -207,6 +207,35 @@ Notes on [someipy](https://github.com/chrizog/someipy) 2.1.2, the pure-Python SO
 - For production-grade interop testing, the same service interfaces can be implemented with
   [vsomeip](https://github.com/COVESA/vsomeip) (C++). The wire format is standard SOME/IP.
 
+### Vehicle API standards (OSDVI, OEM profiles)
+
+The **APIs** tab exposes the same vehicle through several Vehicle API standards. Each one is
+an adapter over the VSS signals, so it works in every mode, including the CAN and SOME/IP ECUs.
+
+| API | Status | Where |
+|---|---|---|
+| COVESA VSS | Native signal model | `src/vss/` |
+| **Open SDV API (OSDVI, Japan)** | Logical API from the public spec "Open SDV API 仕様 202603α" (Open SDV Initiative / Nagoya University), for the objects this simulator has: `Window`, `Door`, `Trunk`, `Wiper`. Common calls (`getConfigAll`, `getStatus`, `notify`/`getEvent`/`unnotify`), MovableObject (`startMove`, `stopMove`), LockableObject (`lock`/`unlock` with priorities), the `E_*` return codes and events (`ControlledBySelf`/`ControlledByOther`, `TargetReached`, `OwnLockRevoked`, ...) | `src/vapi/osdvi.ts` |
+| OEM-specific / attribute APIs | Declarative JSON profiles: attribute → VSS signal, value maps, scaling, read/readwrite. A fictional example ships in `src/vapi/profiles/acme-example.json`; load your own from the APIs tab | `src/vapi/attributeApi.ts` |
+| K-SDV (Korea) | **Not included**: the attribute list isn't public. Once you have it, it's a JSON profile like the ACME example | – |
+
+Applications can be written against OSDVI directly. **Window Sync (OSDVI)** in the Apps tab
+uses only the Open SDV API: the passenger window follows the driver's window, and the app
+holds a priority-60 lock so other OSDVI clients get `E_OBJECT_LOCKED`. From the browser console:
+
+```js
+const api = sdv.osdvi.app('my-app');
+api.Window.getConfigAll();               // instances with row/zone placement
+api.Window.startMove(1, 100);            // { returnValue: 'E_OK' }
+const { notifyHandle } = api.Window.notify(1, null);
+api.Window.getEvent(notifyHandle);       // { returnValue: 'E_OK', event: { eventInfo: { kind: 'ControlledBySelf' } } }
+```
+
+OSDVI simplifications: doors and the trunk move instantly (positions 0/100); risk control is
+reduced to refusing door/trunk opening above 5 km/h (`E_OBJECT_STATUS`); wiper
+`frequencyLevel`/`intervalLevel` map onto the VSS wiper modes; no washer (`startWasher` →
+`E_INFEASIBLE`). The 3D car is left-hand drive (driver = `Left`).
+
 ### AI layer (Claude)
 
 The **AI ✦** tab adds three Claude-powered tools. They call the Claude API (`claude-opus-5-5`)
