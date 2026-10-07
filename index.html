@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SDV Sim</title>
+    <script type="module" crossorigin src="./assets/index-bDKcqcEW.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-CpUlrDin.css">
+  </head>
+  <body>
+    <main class="layout">
+      <div class="stage">
+        <div id="viewport"></div>
+        <div class="hud" aria-live="off">
+          <span id="hud-left" class="ind" aria-label="Left indicator">◀</span>
+          <div class="speedo">
+            <span id="hud-speed">0</span><small>km/h</small>
+          </div>
+          <span id="hud-right" class="ind" aria-label="Right indicator">▶</span>
+          <div class="hud-meta">
+            <span id="hud-gear" class="gear">D</span>
+            <span id="hud-low" class="tell" title="Low beam">LOW</span>
+            <span id="hud-high" class="tell high" title="High beam">HIGH</span>
+            <span id="hud-odo" class="odo">0.00 km</span>
+            <span id="hud-auto" class="tell auto" hidden></span>
+          </div>
+        </div>
+        <div id="toast" class="toast" role="status" hidden></div>
+        <div class="keys">
+          <b>W/S</b> throttle/brake · <b>A/D</b> steer · <b>R</b> reverse · <b>Q/E</b> indicators · <b>H</b> hazard · <b>L/K</b> low/high beam · <b>C</b> camera
+        </div>
+      </div>
+      <aside class="panel">
+        <header>
+          <h1>SDV Sim</h1>
+          <p>Virtual vehicle on a VSS data broker</p>
+          <span id="broker-status" class="broker-status" data-state="connecting">Starting…</span>
+          <nav role="tablist">
+            <button role="tab" data-tab="drive">Drive</button>
+            <button role="tab" data-tab="signals">Signals</button>
+            <button role="tab" data-tab="apps">Apps</button>
+            <button role="tab" data-tab="trace">Trace</button>
+            <button role="tab" data-tab="apis">APIs</button>
+            <button role="tab" data-tab="ai">AI ✦</button>
+          </nav>
+        </header>
+        <div id="panel-body"></div>
+      </aside>
+    </main>
+  </body>
+</html>
