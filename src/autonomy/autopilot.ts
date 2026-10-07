@@ -35,6 +35,7 @@ export class Autopilot {
   private elapsed = 0;
   private stillFor = 0;
   private waited = 0; // seconds stopped in city traffic, for the deadlock breaker
+  private signal: 'Left' | 'Right' | null = null; // indicator the autopilot has switched on
   private readonly listeners = new Set<(event: string, detail?: unknown) => void>();
   /** Full planned route (for the minimap). */
   route: Path | null = null;
@@ -174,6 +175,7 @@ export class Autopilot {
     this.segments = [];
     this.route = null;
     this.parkBay = null;
+    this.indicate(null);
     this.broker.publishValue('Vehicle.Chassis.Accelerator.PedalPosition', 0, SRC);
     this.broker.publishValue('Vehicle.Chassis.SteeringWheel.Angle', 0, SRC);
     this.emit('disengaged', reason);
@@ -257,6 +259,7 @@ export class Autopilot {
       target = { x: end.p.x + end.t.x * (ahead - sg.path.length), z: end.p.z + end.t.z * (ahead - sg.path.length) };
     }
     this.broker.publishValue('Vehicle.Chassis.SteeringWheel.Angle', Math.round(this.steer(target, sg.reverse)), SRC);
+    this.indicate(sg.reverse ? null : this.upcomingTurn(sg, speed, remaining));
 
     // Speed: IDM against everything that can make us stop, including the end of this segment.
     // IDM settles at its minimum gap gap0, so shift the segment end by it to stop right at the end.
@@ -282,6 +285,40 @@ export class Autopilot {
     }
   }
 
+  /**
+   * Which way the route bends within the signalling distance ahead (about 30 m in town, 10 m in
+   * the lot): compares the path direction here with the direction further along. Also signals
+   * right when pulling over at the end of a drive.
+   */
+  private upcomingTurn(sg: Segment, speed: number, remaining: number): 'Left' | 'Right' | null {
+    const window = sg.city ? Math.max(25, speed * 3) : 10;
+    const t0 = sg.path.at(this.s).t;
+    let best = 0;
+    for (let d = 2; d <= window && this.s + d <= sg.path.length; d += 2) {
+      const t1 = sg.path.at(this.s + d).t;
+      // Cross product > 0: the path turns towards the car's right (see forwardOf / right vector).
+      const turn = Math.atan2(t0.x * t1.z - t0.z * t1.x, t0.x * t1.x + t0.z * t1.z);
+      if (Math.abs(turn) > Math.abs(best)) best = turn;
+    }
+    // Switch on for a real bend (> ~30°); keep it on until the turn is done (hysteresis, and while
+    // the wheel is still turned that way), like a driver would.
+    const wheel = this.broker.get('Vehicle.Chassis.SteeringWheel.Angle').value as number; // + is left
+    if (best > 0.5 || (this.signal === 'Right' && (best > 0.15 || wheel < -15))) return 'Right';
+    if (best < -0.5 || (this.signal === 'Left' && (best < -0.15 || wheel > 15))) return 'Left';
+    const last = this.seg === this.segments.length - 1;
+    if (sg.city && last && this.mode === 'drive' && remaining < 25) return 'Right'; // pulling over
+    return null;
+  }
+
+  /** Switches the indicators like a driver: only when the intention changes. */
+  private indicate(side: 'Left' | 'Right' | null): void {
+    if (side === this.signal) return;
+    const path = (x: 'Left' | 'Right') => `Vehicle.Body.Lights.DirectionIndicator.${x}.IsSignaling`;
+    if (side) this.broker.actuate(path(side), true, SRC);
+    else if (this.signal && this.broker.get(path(this.signal)).value) this.broker.actuate(path(this.signal), false, SRC);
+    this.signal = side;
+  }
+
   /** Maps a desired acceleration onto accelerator/brake pedal positions. */
   private pedals(a: number, speed: number): void {
     const resist = (speed > 0.05 ? ROLLING : 0) + DRAG * speed;
@@ -305,7 +342,8 @@ export class Autopilot {
       this.emit('segment', this.seg);
       return;
     }
-    // Arrived: hold with the brake, back in drive, wheel straight.
+    // Arrived: hold with the brake, back in drive, wheel straight, indicator off.
+    this.indicate(null);
     this.broker.publishValue('Vehicle.Chassis.Accelerator.PedalPosition', 0, SRC);
     this.broker.publishValue('Vehicle.Chassis.Brake.PedalPosition', 30, SRC);
     this.broker.publishValue('Vehicle.Chassis.SteeringWheel.Angle', 0, SRC);
